@@ -11,6 +11,7 @@ from .scannet_dataset import (ScanNetDataset, ScanNetInstanceSegDataset,
 from .seg3d_dataset import Seg3DDataset
 from .semantickitti_dataset import SemanticKITTIDataset
 from .sunrgbd_dataset import SUNRGBDDataset
+from .suscape_dataset import SuscapeDataset
 # yapf: disable
 from .transforms import (AffineResize, BackgroundPointsFilter, GlobalAlignment,
                          GlobalRotScaleTrans, IndoorPatchPointSample,
@@ -33,7 +34,7 @@ __all__ = [
     'NormalizePointsColor', 'IndoorPatchPointSample', 'IndoorPointSample',
     'PointSample', 'LoadAnnotations3D', 'GlobalAlignment', 'SUNRGBDDataset',
     'ScanNetDataset', 'ScanNetSegDataset', 'ScanNetInstanceSegDataset',
-    'SemanticKITTIDataset', 'Det3DDataset', 'Seg3DDataset',
+    'SemanticKITTIDataset', 'Det3DDataset', 'Seg3DDataset', 'SuscapeDataset'
     'LoadPointsFromMultiSweeps', 'WaymoDataset', 'BackgroundPointsFilter',
     'VoxelBasedPointSampler', 'get_loading_pipeline', 'RandomDropPointsColor',
     'RandomJitterPoints', 'ObjectNameFilter', 'AffineResize',

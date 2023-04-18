@@ -6,6 +6,7 @@ from tools.dataset_converters import indoor_converter as indoor
 from tools.dataset_converters import kitti_converter as kitti
 from tools.dataset_converters import lyft_converter as lyft_converter
 from tools.dataset_converters import nuscenes_converter as nuscenes_converter
+from tools.dataset_converters import suscape_converter as suscape_converter
 from tools.dataset_converters.create_gt_database import (
     GTDatabaseCreater, create_groundtruth_database)
 from tools.dataset_converters.update_infos_to_v2 import update_pkl_infos
@@ -109,6 +110,19 @@ def lyft_data_prep(root_path, info_prefix, version, max_sweeps=10):
         update_pkl_infos('lyft', out_dir=root_path, pkl_path=info_train_path)
         update_pkl_infos('lyft', out_dir=root_path, pkl_path=info_val_path)
 
+def suscape_data_prep(root_path, info_prefix, version, out_path):
+    """Prepare data related to Suscape dataset.
+
+    Related data consists of '.pkl' files recording basic infos.
+    Args:
+        root_path (str): Path of dataset root.
+        info_prefix (str): The prefix of info filenames.
+        version (str): Dataset version.
+        max_sweeps (int, optional): Number of input consecutive frames.
+            Defaults to 10.
+    """
+    suscape_converter.create_suscape_infos(
+        root_path, info_prefix, out_path, version=version, max_sweeps=1)
 
 def scannet_data_prep(root_path, info_prefix, out_dir, workers):
     """Prepare the info file for scannet dataset.
@@ -333,5 +347,10 @@ if __name__ == '__main__':
             info_prefix=args.extra_tag,
             out_dir=args.out_dir,
             workers=args.workers)
+    elif args.dataset == 'suscape':
+        suscape_data_prep(root_path=args.root_path,
+            info_prefix=args.extra_tag,
+            version=args.version,
+            out_path=args.out_dir)
     else:
         raise NotImplementedError(f'Don\'t support {args.dataset} dataset.')

@@ -6,7 +6,7 @@ from mmdet3d.registry import MODELS
 from mmdet3d.utils import ConfigType, OptConfigType, OptMultiConfig
 from ...structures.det3d_data_sample import SampleList
 from .base import Base3DDetector
-
+import torch
 
 @MODELS.register_module()
 class TwoStage3DDetector(Base3DDetector):
@@ -85,6 +85,7 @@ class TwoStage3DDetector(Base3DDetector):
 
         losses = dict()
 
+        print('before loss, memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
         # RPN forward and loss
         if self.with_rpn:
             proposal_cfg = self.train_cfg.get('rpn_proposal',
@@ -116,6 +117,7 @@ class TwoStage3DDetector(Base3DDetector):
                                         batch_data_samples, **kwargs)
         losses.update(roi_losses)
 
+        print('after loss, memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
         return losses
 
     def predict(self, batch_inputs_dict: dict, batch_data_samples: SampleList,
@@ -187,6 +189,9 @@ class TwoStage3DDetector(Base3DDetector):
             tuple: A tuple of features from ``rpn_head`` and ``roi_head``
             forward.
         """
+        #print cuda memory usage info
+        print('memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
+
         feats_dict = self.extract_feat(batch_inputs_dict)
         rpn_outs = self.rpn_head.forward(feats_dict['neck_feats'])
 

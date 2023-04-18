@@ -56,11 +56,15 @@ class PointRCNN(TwoStage3DDetector):
         Returns:
             dict: Features from the backbone+neck and raw points.
         """
+        #print('before feat, memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
         points = torch.stack(batch_inputs_dict['points'])
         x = self.backbone(points)
+        #print('before neck, memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
 
         if self.with_neck:
             x = self.neck(x)
+        
+        #print('after neck, memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
         return dict(
             fp_features=x['fp_features'].clone(),
             fp_points=x['fp_xyz'].clone(),

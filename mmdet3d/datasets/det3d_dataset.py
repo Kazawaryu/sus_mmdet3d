@@ -255,6 +255,7 @@ class Det3DDataset(BaseDataset):
                 ann_info[mapped_ann_name] = temp_anns
             ann_info['instances'] = info['instances']
 
+            #print(ann_info)
             for label in ann_info['gt_labels_3d']:
                 if label != -1:
                     cat_name = self.metainfo['classes'][label]
