@@ -144,9 +144,15 @@ data_root = 'data/kitti/'
 class_names = ['Pedestrian', 'Cyclist', 'Car']
 metainfo = dict(classes=class_names)
 input_modality = dict(use_lidar=True, use_camera=True)
+backend_args = None
 train_pipeline = [
-    dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=4, use_dim=4),
-    dict(type='LoadImageFromFile'),
+    dict(
+        type='LoadPointsFromFile',
+        coord_type='LIDAR',
+        load_dim=4,
+        use_dim=4,
+        backend_args=backend_args),
+    dict(type='LoadImageFromFile', backend_args=backend_args),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
     dict(
         type='RandomResize', scale=[(640, 192), (2560, 768)], keep_ratio=True),
@@ -167,8 +173,13 @@ train_pipeline = [
         ])
 ]
 test_pipeline = [
-    dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=4, use_dim=4),
-    dict(type='LoadImageFromFile'),
+    dict(
+        type='LoadPointsFromFile',
+        coord_type='LIDAR',
+        load_dim=4,
+        use_dim=4,
+        backend_args=backend_args),
+    dict(type='LoadImageFromFile', backend_args=backend_args),
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1280, 384),
@@ -208,7 +219,8 @@ train_dataloader = dict(
             metainfo=metainfo,
             # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
             # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-            box_type_3d='LiDAR')))
+            box_type_3d='LiDAR',
+            backend_args=backend_args)))
 
 val_dataloader = dict(
     batch_size=1,
@@ -224,7 +236,8 @@ val_dataloader = dict(
         pipeline=test_pipeline,
         metainfo=metainfo,
         test_mode=True,
-        box_type_3d='LiDAR'))
+        box_type_3d='LiDAR',
+        backend_args=backend_args))
 test_dataloader = dict(
     batch_size=1,
     num_workers=1,
@@ -239,7 +252,8 @@ test_dataloader = dict(
         pipeline=test_pipeline,
         metainfo=metainfo,
         test_mode=True,
-        box_type_3d='LiDAR'))
+        box_type_3d='LiDAR',
+        backend_args=backend_args))
 
 optim_wrapper = dict(
     optimizer=dict(weight_decay=0.01),
@@ -248,6 +262,10 @@ optim_wrapper = dict(
 val_evaluator = dict(
     type='KittiMetric', ann_file='data/kitti/kitti_infos_val.pkl')
 test_evaluator = val_evaluator
+
+vis_backends = [dict(type='LocalVisBackend')]
+visualizer = dict(
+    type='Det3DLocalVisualizer', vis_backends=vis_backends, name='visualizer')
 
 # You may need to download the model first is the network is unstable
 load_from = 'https://download.openmmlab.com/mmdetection3d/pretrain_models/mvx_faster_rcnn_detectron2-caffe_20e_coco-pretrain_gt-sample_kitti-3-class_moderate-79.3_20200207-a4a6a3c7.pth'  # noqa

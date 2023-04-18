@@ -8,8 +8,10 @@ import numpy as np
 from mmcv.transforms import LoadImageFromFile
 from mmcv.transforms.base import BaseTransform
 from mmdet.datasets.transforms import LoadAnnotations
+from mmengine.fileio import get
 
 from mmdet3d.registry import TRANSFORMS
+from mmdet3d.structures.bbox_3d import get_box_type
 from mmdet3d.structures.points import BasePoints, get_points_type
 
 
@@ -23,9 +25,8 @@ class LoadMultiViewImageFromFiles(BaseTransform):
         to_float32 (bool): Whether to convert the img to float32.
             Defaults to False.
         color_type (str): Color type of the file. Defaults to 'unchanged'.
-        file_client_args (dict): Arguments to instantiate a FileClient.
-            See :class:`mmengine.fileio.FileClient` for details.
-            Defaults to dict(backend='disk').
+        backend_args (dict, optional): Arguments to instantiate the
+            corresponding backend. Defaults to None.
         num_views (int): Number of view in a frame. Defaults to 5.
         num_ref_frames (int): Number of frame in loading. Defaults to -1.
         test_mode (bool): Whether is test mode in loading. Defaults to False.
@@ -36,15 +37,14 @@ class LoadMultiViewImageFromFiles(BaseTransform):
     def __init__(self,
                  to_float32: bool = False,
                  color_type: str = 'unchanged',
-                 file_client_args: dict = dict(backend='disk'),
+                 backend_args: Optional[dict] = None,
                  num_views: int = 5,
                  num_ref_frames: int = -1,
                  test_mode: bool = False,
                  set_default_scale: bool = True) -> None:
         self.to_float32 = to_float32
         self.color_type = color_type
-        self.file_client_args = file_client_args.copy()
-        self.file_client = None
+        self.backend_args = backend_args
         self.num_views = num_views
         # num_ref_frames is used for multi-sweep loading
         self.num_ref_frames = num_ref_frames
@@ -162,12 +162,11 @@ class LoadMultiViewImageFromFiles(BaseTransform):
 
         results['ori_cam2img'] = copy.deepcopy(results['cam2img'])
 
-        if self.file_client is None:
-            self.file_client = mmengine.FileClient(**self.file_client_args)
-
         # img is of shape (h, w, c, num_views)
         # h and w can be different for different views
-        img_bytes = [self.file_client.get(name) for name in filename]
+        img_bytes = [
+            get(name, backend_args=self.backend_args) for name in filename
+        ]
         imgs = [
             mmcv.imfrombytes(img_byte, flag=self.color_type)
             for img_byte in img_bytes
@@ -193,10 +192,10 @@ class LoadMultiViewImageFromFiles(BaseTransform):
         # unravel to list, see `DefaultFormatBundle` in formating.py
         # which will transpose each image separately and then stack into array
         results['img'] = [img[..., i] for i in range(img.shape[-1])]
-        results['img_shape'] = img.shape
-        results['ori_shape'] = img.shape
+        results['img_shape'] = img.shape[:2]
+        results['ori_shape'] = img.shape[:2]
         # Set initial values for default meta_keys
-        results['pad_shape'] = img.shape
+        results['pad_shape'] = img.shape[:2]
         if self.set_default_scale:
             results['scale_factor'] = 1.0
         num_channels = 1 if len(img.shape) < 3 else img.shape[2]
@@ -254,9 +253,15 @@ class LoadImageFromFileMono3D(LoadImageFromFile):
                 'Currently we only support load image from kitti and'
                 'nuscenes datasets')
 
-        img_bytes = self.file_client.get(filename)
-        img = mmcv.imfrombytes(
-            img_bytes, flag=self.color_type, backend=self.imdecode_backend)
+        try:
+            img_bytes = get(filename, backend_args=self.backend_args)
+            img = mmcv.imfrombytes(
+                img_bytes, flag=self.color_type, backend=self.imdecode_backend)
+        except Exception as e:
+            if self.ignore_empty:
+                return None
+            else:
+                raise e
         if self.to_float32:
             img = img.astype(np.float32)
 
@@ -264,6 +269,46 @@ class LoadImageFromFileMono3D(LoadImageFromFile):
         results['img_shape'] = img.shape[:2]
         results['ori_shape'] = img.shape[:2]
 
+        return results
+
+
+@TRANSFORMS.register_module()
+class LoadImageFromNDArray(LoadImageFromFile):
+    """Load an image from ``results['img']``.
+    Similar with :obj:`LoadImageFromFile`, but the image has been loaded as
+    :obj:`np.ndarray` in ``results['img']``. Can be used when loading image
+    from webcam.
+    Required Keys:
+    - img
+    Modified Keys:
+    - img
+    - img_path
+    - img_shape
+    - ori_shape
+    Args:
+        to_float32 (bool): Whether to convert the loaded image to a float32
+            numpy array. If set to False, the loaded image is an uint8 array.
+            Defaults to False.
+    """
+
+    def transform(self, results: dict) -> dict:
+        """Transform function to add image meta information.
+
+        Args:
+            results (dict): Result dict with Webcam read image in
+                ``results['img']``.
+        Returns:
+            dict: The dict contains loaded image and meta information.
+        """
+
+        img = results['img']
+        if self.to_float32:
+            img = img.astype(np.float32)
+
+        results['img_path'] = None
+        results['img'] = img
+        results['img_shape'] = img.shape[:2]
+        results['ori_shape'] = img.shape[:2]
         return results
 
 
@@ -277,9 +322,8 @@ class LoadPointsFromMultiSweeps(BaseTransform):
         sweeps_num (int): Number of sweeps. Defaults to 10.
         load_dim (int): Dimension number of the loaded points. Defaults to 5.
         use_dim (list[int]): Which dimension to use. Defaults to [0, 1, 2, 4].
-        file_client_args (dict): Arguments to instantiate a FileClient.
-            See :class:`mmengine.fileio.FileClient` for details.
-            Defaults to dict(backend='disk').
+        backend_args (dict, optional): Arguments to instantiate the
+            corresponding backend. Defaults to None.
         pad_empty_sweeps (bool): Whether to repeat keyframe when
             sweeps is empty. Defaults to False.
         remove_close (bool): Whether to remove close points. Defaults to False.
@@ -291,15 +335,18 @@ class LoadPointsFromMultiSweeps(BaseTransform):
                  sweeps_num: int = 10,
                  load_dim: int = 5,
                  use_dim: List[int] = [0, 1, 2, 4],
-                 file_client_args: dict = dict(backend='disk'),
+                 backend_args: Optional[dict] = None,
                  pad_empty_sweeps: bool = False,
                  remove_close: bool = False,
                  test_mode: bool = False) -> None:
         self.load_dim = load_dim
         self.sweeps_num = sweeps_num
+        if isinstance(use_dim, int):
+            use_dim = list(range(use_dim))
+        assert max(use_dim) < load_dim, \
+            f'Expect all used dimensions < {load_dim}, got {use_dim}'
         self.use_dim = use_dim
-        self.file_client_args = file_client_args.copy()
-        self.file_client = None
+        self.backend_args = backend_args
         self.pad_empty_sweeps = pad_empty_sweeps
         self.remove_close = remove_close
         self.test_mode = test_mode
@@ -313,10 +360,8 @@ class LoadPointsFromMultiSweeps(BaseTransform):
         Returns:
             np.ndarray: An array containing point clouds data.
         """
-        if self.file_client is None:
-            self.file_client = mmengine.FileClient(**self.file_client_args)
         try:
-            pts_bytes = self.file_client.get(pts_filename)
+            pts_bytes = get(pts_filename, backend_args=self.backend_args)
             points = np.frombuffer(pts_bytes, dtype=np.float32)
         except ConnectionError:
             mmengine.check_file_exist(pts_filename)
@@ -534,21 +579,18 @@ class LoadPointsFromFile(BaseTransform):
         use_color (bool): Whether to use color features. Defaults to False.
         norm_intensity (bool): Whether to normlize the intensity. Defaults to
             False.
-        file_client_args (dict): Arguments to instantiate a FileClient.
-            See :class:`mmengine.fileio.FileClient` for details.
-            Defaults to dict(backend='disk').
+        backend_args (dict, optional): Arguments to instantiate the
+            corresponding backend. Defaults to None.
     """
 
-    def __init__(
-        self,
-        coord_type: str,
-        load_dim: int = 6,
-        use_dim: Union[int, List[int]] = [0, 1, 2],
-        shift_height: bool = False,
-        use_color: bool = False,
-        norm_intensity: bool = False,
-        file_client_args: dict = dict(backend='disk')
-    ) -> None:
+    def __init__(self,
+                 coord_type: str,
+                 load_dim: int = 6,
+                 use_dim: Union[int, List[int]] = [0, 1, 2],
+                 shift_height: bool = False,
+                 use_color: bool = False,
+                 norm_intensity: bool = False,
+                 backend_args: Optional[dict] = None) -> None:
         self.shift_height = shift_height
         self.use_color = use_color
         if isinstance(use_dim, int):
@@ -561,8 +603,7 @@ class LoadPointsFromFile(BaseTransform):
         self.load_dim = load_dim
         self.use_dim = use_dim
         self.norm_intensity = norm_intensity
-        self.file_client_args = file_client_args.copy()
-        self.file_client = None
+        self.backend_args = backend_args
 
     def _load_points(self, pts_filename: str) -> np.ndarray:
         """Private function to load point clouds data.
@@ -573,10 +614,8 @@ class LoadPointsFromFile(BaseTransform):
         Returns:
             np.ndarray: An array containing point clouds data.
         """
-        if self.file_client is None:
-            self.file_client = mmengine.FileClient(**self.file_client_args)
         try:
-            pts_bytes = self.file_client.get(pts_filename)
+            pts_bytes = get(pts_filename, backend_args=self.backend_args)
             points = np.frombuffer(pts_bytes, dtype=np.float32)
         except ConnectionError:
             mmengine.check_file_exist(pts_filename)
@@ -640,7 +679,7 @@ class LoadPointsFromFile(BaseTransform):
         repr_str = self.__class__.__name__ + '('
         repr_str += f'shift_height={self.shift_height}, '
         repr_str += f'use_color={self.use_color}, '
-        repr_str += f'file_client_args={self.file_client_args}, '
+        repr_str += f'backend_args={self.backend_args}, '
         repr_str += f'load_dim={self.load_dim}, '
         repr_str += f'use_dim={self.use_dim})'
         return repr_str
@@ -651,7 +690,48 @@ class LoadPointsFromDict(LoadPointsFromFile):
     """Load Points From Dict."""
 
     def transform(self, results: dict) -> dict:
+        """Convert the type of points from ndarray to corresponding
+        `point_class`.
+
+        Args:
+            results (dict): input result. The value of key `points` is a
+                numpy array.
+
+        Returns:
+            dict: The processed results.
+        """
         assert 'points' in results
+        points = results['points']
+
+        if self.norm_intensity:
+            assert len(self.use_dim) >= 4, \
+                f'When using intensity norm, expect used dimensions >= 4, got {len(self.use_dim)}'  # noqa: E501
+            points[:, 3] = np.tanh(points[:, 3])
+        attribute_dims = None
+
+        if self.shift_height:
+            floor_height = np.percentile(points[:, 2], 0.99)
+            height = points[:, 2] - floor_height
+            points = np.concatenate(
+                [points[:, :3],
+                 np.expand_dims(height, 1), points[:, 3:]], 1)
+            attribute_dims = dict(height=3)
+
+        if self.use_color:
+            assert len(self.use_dim) >= 6
+            if attribute_dims is None:
+                attribute_dims = dict()
+            attribute_dims.update(
+                dict(color=[
+                    points.shape[1] - 3,
+                    points.shape[1] - 2,
+                    points.shape[1] - 1,
+                ]))
+
+        points_class = get_points_type(self.coord_type)
+        points = points_class(
+            points, points_dim=points.shape[-1], attribute_dims=attribute_dims)
+        results['points'] = points
         return results
 
 
@@ -686,6 +766,8 @@ class LoadAnnotations3D(LoadAnnotations):
       Only when `with_mask_3d` is True.
     - pts_semantic_mask_path (str): Path of semantic mask file.
       Only when `with_seg_3d` is True.
+    - pts_panoptic_mask_path (str): Path of panoptic mask file.
+      Only when both `with_panoptic_3d` is True.
 
     Added Keys:
 
@@ -723,44 +805,54 @@ class LoadAnnotations3D(LoadAnnotations):
         with_mask (bool): Whether to load 2D instance masks. Defaults to False.
         with_seg (bool): Whether to load 2D semantic masks. Defaults to False.
         with_bbox_depth (bool): Whether to load 2.5D boxes. Defaults to False.
+        with_panoptic_3d (bool): Whether to load 3D panoptic masks for points.
+            Defaults to False.
         poly2mask (bool): Whether to convert polygon annotations to bitmasks.
             Defaults to True.
-        seg_3d_dtype (dtype): Dtype of 3D semantic masks. Defaults to int64.
-        file_client_args (dict): Arguments to instantiate a FileClient.
-            See :class:`mmengine.fileio.FileClient` for details.
-            Defaults to dict(backend='disk').
+        seg_3d_dtype (str): String of dtype of 3D semantic masks.
+            Defaults to 'np.int64'.
+        seg_offset (int): The offset to split semantic and instance labels from
+            panoptic labels. Defaults to None.
+        dataset_type (str): Type of dataset used for splitting semantic and
+            instance labels. Defaults to None.
+        backend_args (dict, optional): Arguments to instantiate the
+            corresponding backend. Defaults to None.
     """
 
-    def __init__(
-        self,
-        with_bbox_3d: bool = True,
-        with_label_3d: bool = True,
-        with_attr_label: bool = False,
-        with_mask_3d: bool = False,
-        with_seg_3d: bool = False,
-        with_bbox: bool = False,
-        with_label: bool = False,
-        with_mask: bool = False,
-        with_seg: bool = False,
-        with_bbox_depth: bool = False,
-        poly2mask: bool = True,
-        seg_3d_dtype: np.dtype = np.int64,
-        file_client_args: dict = dict(backend='disk')
-    ) -> None:
+    def __init__(self,
+                 with_bbox_3d: bool = True,
+                 with_label_3d: bool = True,
+                 with_attr_label: bool = False,
+                 with_mask_3d: bool = False,
+                 with_seg_3d: bool = False,
+                 with_bbox: bool = False,
+                 with_label: bool = False,
+                 with_mask: bool = False,
+                 with_seg: bool = False,
+                 with_bbox_depth: bool = False,
+                 with_panoptic_3d: bool = False,
+                 poly2mask: bool = True,
+                 seg_3d_dtype: str = 'np.int64',
+                 seg_offset: int = None,
+                 dataset_type: str = None,
+                 backend_args: Optional[dict] = None) -> None:
         super().__init__(
             with_bbox=with_bbox,
             with_label=with_label,
             with_mask=with_mask,
             with_seg=with_seg,
             poly2mask=poly2mask,
-            file_client_args=file_client_args)
+            backend_args=backend_args)
         self.with_bbox_3d = with_bbox_3d
         self.with_bbox_depth = with_bbox_depth
         self.with_label_3d = with_label_3d
         self.with_attr_label = with_attr_label
         self.with_mask_3d = with_mask_3d
         self.with_seg_3d = with_seg_3d
-        self.seg_3d_dtype = seg_3d_dtype
+        self.with_panoptic_3d = with_panoptic_3d
+        self.seg_3d_dtype = eval(seg_3d_dtype)
+        self.seg_offset = seg_offset
+        self.dataset_type = dataset_type
 
     def _load_bboxes_3d(self, results: dict) -> dict:
         """Private function to move the 3D bounding box annotation from
@@ -826,10 +918,9 @@ class LoadAnnotations3D(LoadAnnotations):
         """
         pts_instance_mask_path = results['pts_instance_mask_path']
 
-        if self.file_client is None:
-            self.file_client = mmengine.FileClient(**self.file_client_args)
         try:
-            mask_bytes = self.file_client.get(pts_instance_mask_path)
+            mask_bytes = get(
+                pts_instance_mask_path, backend_args=self.backend_args)
             pts_instance_mask = np.frombuffer(mask_bytes, dtype=np.int64)
         except ConnectionError:
             mmengine.check_file_exist(pts_instance_mask_path)
@@ -853,10 +944,9 @@ class LoadAnnotations3D(LoadAnnotations):
         """
         pts_semantic_mask_path = results['pts_semantic_mask_path']
 
-        if self.file_client is None:
-            self.file_client = mmengine.FileClient(**self.file_client_args)
         try:
-            mask_bytes = self.file_client.get(pts_semantic_mask_path)
+            mask_bytes = get(
+                pts_semantic_mask_path, backend_args=self.backend_args)
             # add .copy() to fix read-only bug
             pts_semantic_mask = np.frombuffer(
                 mask_bytes, dtype=self.seg_3d_dtype).copy()
@@ -865,10 +955,56 @@ class LoadAnnotations3D(LoadAnnotations):
             pts_semantic_mask = np.fromfile(
                 pts_semantic_mask_path, dtype=np.int64)
 
+        if self.dataset_type == 'semantickitti':
+            pts_semantic_mask = pts_semantic_mask.astype(np.int64)
+            pts_semantic_mask = pts_semantic_mask % self.seg_offset
+        # nuScenes loads semantic and panoptic labels from different files.
+
         results['pts_semantic_mask'] = pts_semantic_mask
+
         # 'eval_ann_info' will be passed to evaluator
         if 'eval_ann_info' in results:
             results['eval_ann_info']['pts_semantic_mask'] = pts_semantic_mask
+        return results
+
+    def _load_panoptic_3d(self, results: dict) -> dict:
+        """Private function to load 3D panoptic segmentation annotations.
+
+        Args:
+            results (dict): Result dict from :obj:`mmdet3d.CustomDataset`.
+
+        Returns:
+            dict: The dict containing the panoptic segmentation annotations.
+        """
+        pts_panoptic_mask_path = results['pts_panoptic_mask_path']
+
+        try:
+            mask_bytes = get(
+                pts_panoptic_mask_path, backend_args=self.backend_args)
+            # add .copy() to fix read-only bug
+            pts_panoptic_mask = np.frombuffer(
+                mask_bytes, dtype=self.seg_3d_dtype).copy()
+        except ConnectionError:
+            mmengine.check_file_exist(pts_panoptic_mask_path)
+            pts_panoptic_mask = np.fromfile(
+                pts_panoptic_mask_path, dtype=np.int64)
+
+        if self.dataset_type == 'semantickitti':
+            pts_semantic_mask = pts_panoptic_mask.astype(np.int64)
+            pts_semantic_mask = pts_semantic_mask % self.seg_offset
+        elif self.dataset_type == 'nuscenes':
+            pts_semantic_mask = pts_semantic_mask // self.seg_offset
+
+        results['pts_semantic_mask'] = pts_semantic_mask
+
+        # We can directly take panoptic labels as instance ids.
+        pts_instance_mask = pts_panoptic_mask.astype(np.int64)
+        results['pts_instance_mask'] = pts_instance_mask
+
+        # 'eval_ann_info' will be passed to evaluator
+        if 'eval_ann_info' in results:
+            results['eval_ann_info']['pts_semantic_mask'] = pts_semantic_mask
+            results['eval_ann_info']['pts_instance_mask'] = pts_instance_mask
         return results
 
     def _load_bboxes(self, results: dict) -> None:
@@ -916,11 +1052,12 @@ class LoadAnnotations3D(LoadAnnotations):
             results = self._load_labels_3d(results)
         if self.with_attr_label:
             results = self._load_attr_labels(results)
+        if self.with_panoptic_3d:
+            results = self._load_panoptic_3d(results)
         if self.with_mask_3d:
             results = self._load_masks_3d(results)
         if self.with_seg_3d:
             results = self._load_semantic_seg_3d(results)
-
         return results
 
     def __repr__(self) -> str:
@@ -932,10 +1069,251 @@ class LoadAnnotations3D(LoadAnnotations):
         repr_str += f'{indent_str}with_attr_label={self.with_attr_label}, '
         repr_str += f'{indent_str}with_mask_3d={self.with_mask_3d}, '
         repr_str += f'{indent_str}with_seg_3d={self.with_seg_3d}, '
+        repr_str += f'{indent_str}with_panoptic_3d={self.with_panoptic_3d}, '
         repr_str += f'{indent_str}with_bbox={self.with_bbox}, '
         repr_str += f'{indent_str}with_label={self.with_label}, '
         repr_str += f'{indent_str}with_mask={self.with_mask}, '
         repr_str += f'{indent_str}with_seg={self.with_seg}, '
         repr_str += f'{indent_str}with_bbox_depth={self.with_bbox_depth}, '
         repr_str += f'{indent_str}poly2mask={self.poly2mask})'
+        repr_str += f'{indent_str}seg_offset={self.seg_offset})'
+
         return repr_str
+
+
+@TRANSFORMS.register_module()
+class LidarDet3DInferencerLoader(BaseTransform):
+    """Load point cloud in the Inferencer's pipeline.
+
+    Added keys:
+      - points
+      - timestamp
+      - axis_align_matrix
+      - box_type_3d
+      - box_mode_3d
+    """
+
+    def __init__(self, coord_type='LIDAR', **kwargs) -> None:
+        super().__init__()
+        self.from_file = TRANSFORMS.build(
+            dict(type='LoadPointsFromFile', coord_type=coord_type, **kwargs))
+        self.from_ndarray = TRANSFORMS.build(
+            dict(type='LoadPointsFromDict', coord_type=coord_type, **kwargs))
+        self.box_type_3d, self.box_mode_3d = get_box_type(coord_type)
+
+    def transform(self, single_input: dict) -> dict:
+        """Transform function to add image meta information.
+        Args:
+            single_input (dict): Single input.
+
+        Returns:
+            dict: The dict contains loaded image and meta information.
+        """
+        assert 'points' in single_input, "key 'points' must be in input dict"
+        if isinstance(single_input['points'], str):
+            inputs = dict(
+                lidar_points=dict(lidar_path=single_input['points']),
+                timestamp=1,
+                # for ScanNet demo we need axis_align_matrix
+                axis_align_matrix=np.eye(4),
+                box_type_3d=self.box_type_3d,
+                box_mode_3d=self.box_mode_3d)
+        elif isinstance(single_input['points'], np.ndarray):
+            inputs = dict(
+                points=single_input['points'],
+                timestamp=1,
+                # for ScanNet demo we need axis_align_matrix
+                axis_align_matrix=np.eye(4),
+                box_type_3d=self.box_type_3d,
+                box_mode_3d=self.box_mode_3d)
+        else:
+            raise ValueError('Unsupported input points type: '
+                             f"{type(single_input['points'])}")
+
+        if 'points' in inputs:
+            return self.from_ndarray(inputs)
+        return self.from_file(inputs)
+
+
+@TRANSFORMS.register_module()
+class MonoDet3DInferencerLoader(BaseTransform):
+    """Load an image from ``results['images']['CAMX']['img']``. Similar with
+    :obj:`LoadImageFromFileMono3D`, but the image has been loaded as
+    :obj:`np.ndarray` in ``results['images']['CAMX']['img']``.
+
+    Added keys:
+      - img
+      - cam2img
+      - box_type_3d
+      - box_mode_3d
+
+    """
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__()
+        self.from_file = TRANSFORMS.build(
+            dict(type='LoadImageFromFileMono3D', **kwargs))
+        self.from_ndarray = TRANSFORMS.build(
+            dict(type='LoadImageFromNDArray', **kwargs))
+
+    def transform(self, single_input: dict) -> dict:
+        """Transform function to add image meta information.
+
+        Args:
+            single_input (dict): Result dict with Webcam read image in
+                ``results['images']['CAMX']['img']``.
+        Returns:
+            dict: The dict contains loaded image and meta information.
+        """
+        box_type_3d, box_mode_3d = get_box_type('camera')
+        assert 'calib' in single_input and 'img' in single_input, \
+            "key 'calib' and 'img' must be in input dict"
+        if isinstance(single_input['calib'], str):
+            calib_path = single_input['calib']
+            with open(calib_path, 'r') as f:
+                lines = f.readlines()
+            cam2img = np.array([
+                float(info) for info in lines[0].split(' ')[0:16]
+            ]).reshape([4, 4])
+        elif isinstance(single_input['calib'], np.ndarray):
+            cam2img = single_input['calib']
+        else:
+            raise ValueError('Unsupported input calib type: '
+                             f"{type(single_input['calib'])}")
+
+        if isinstance(single_input['img'], str):
+            inputs = dict(
+                images=dict(
+                    CAM_FRONT=dict(
+                        img_path=single_input['img'], cam2img=cam2img)),
+                box_mode_3d=box_mode_3d,
+                box_type_3d=box_type_3d)
+        elif isinstance(single_input['img'], np.ndarray):
+            inputs = dict(
+                img=single_input['img'],
+                cam2img=cam2img,
+                box_type_3d=box_type_3d,
+                box_mode_3d=box_mode_3d)
+        else:
+            raise ValueError('Unsupported input image type: '
+                             f"{type(single_input['img'])}")
+
+        if 'img' in inputs:
+            return self.from_ndarray(inputs)
+        return self.from_file(inputs)
+
+
+@TRANSFORMS.register_module()
+class MultiModalityDet3DInferencerLoader(BaseTransform):
+    """Load point cloud and image in the Inferencer's pipeline.
+
+    Added keys:
+      - points
+      - img
+      - cam2img
+      - lidar2cam
+      - lidar2img
+      - timestamp
+      - axis_align_matrix
+      - box_type_3d
+      - box_mode_3d
+    """
+
+    def __init__(self, load_point_args: dict, load_img_args: dict) -> None:
+        super().__init__()
+        self.points_from_file = TRANSFORMS.build(
+            dict(type='LoadPointsFromFile', **load_point_args))
+        self.points_from_ndarray = TRANSFORMS.build(
+            dict(type='LoadPointsFromDict', **load_point_args))
+        coord_type = load_point_args['coord_type']
+        self.box_type_3d, self.box_mode_3d = get_box_type(coord_type)
+
+        self.imgs_from_file = TRANSFORMS.build(
+            dict(type='LoadImageFromFile', **load_img_args))
+        self.imgs_from_ndarray = TRANSFORMS.build(
+            dict(type='LoadImageFromNDArray', **load_img_args))
+
+    def transform(self, single_input: dict) -> dict:
+        """Transform function to add image meta information.
+        Args:
+            single_input (dict): Single input.
+
+        Returns:
+            dict: The dict contains loaded image, point cloud and meta
+            information.
+        """
+        assert 'points' in single_input and 'img' in single_input and \
+            'calib' in single_input, "key 'points', 'img' and 'calib' must be "
+        f'in input dict, but got {single_input}'
+        if isinstance(single_input['points'], str):
+            inputs = dict(
+                lidar_points=dict(lidar_path=single_input['points']),
+                timestamp=1,
+                # for ScanNet demo we need axis_align_matrix
+                axis_align_matrix=np.eye(4),
+                box_type_3d=self.box_type_3d,
+                box_mode_3d=self.box_mode_3d)
+        elif isinstance(single_input['points'], np.ndarray):
+            inputs = dict(
+                points=single_input['points'],
+                timestamp=1,
+                # for ScanNet demo we need axis_align_matrix
+                axis_align_matrix=np.eye(4),
+                box_type_3d=self.box_type_3d,
+                box_mode_3d=self.box_mode_3d)
+        else:
+            raise ValueError('Unsupported input points type: '
+                             f"{type(single_input['points'])}")
+
+        if 'points' in inputs:
+            points_inputs = self.points_from_ndarray(inputs)
+        else:
+            points_inputs = self.points_from_file(inputs)
+
+        multi_modality_inputs = points_inputs
+
+        box_type_3d, box_mode_3d = get_box_type('lidar')
+        if isinstance(single_input['calib'], str):
+            calib = mmengine.load(single_input['calib'])
+
+        elif isinstance(single_input['calib'], dict):
+            calib = single_input['calib']
+        else:
+            raise ValueError('Unsupported input calib type: '
+                             f"{type(single_input['calib'])}")
+
+        cam2img = np.asarray(calib['cam2img'], dtype=np.float32)
+        lidar2cam = np.asarray(calib['lidar2cam'], dtype=np.float32)
+        if 'lidar2cam' in calib:
+            lidar2img = np.asarray(calib['lidar2img'], dtype=np.float32)
+        else:
+            lidar2img = cam2img @ lidar2cam
+
+        if isinstance(single_input['img'], str):
+            inputs = dict(
+                img_path=single_input['img'],
+                cam2img=cam2img,
+                lidar2img=lidar2img,
+                lidar2cam=lidar2cam,
+                box_mode_3d=box_mode_3d,
+                box_type_3d=box_type_3d)
+        elif isinstance(single_input['img'], np.ndarray):
+            inputs = dict(
+                img=single_input['img'],
+                cam2img=cam2img,
+                lidar2img=lidar2img,
+                lidar2cam=lidar2cam,
+                box_type_3d=box_type_3d,
+                box_mode_3d=box_mode_3d)
+        else:
+            raise ValueError('Unsupported input image type: '
+                             f"{type(single_input['img'])}")
+
+        if isinstance(single_input['img'], np.ndarray):
+            imgs_inputs = self.imgs_from_ndarray(inputs)
+        else:
+            imgs_inputs = self.imgs_from_file(inputs)
+
+        multi_modality_inputs.update(imgs_inputs)
+
+        return multi_modality_inputs

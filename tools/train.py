@@ -9,7 +9,7 @@ from mmengine.logging import print_log
 from mmengine.registry import RUNNERS
 from mmengine.runner import Runner
 
-from mmdet3d.utils import register_all_modules, replace_ceph_backend
+from mmdet3d.utils import replace_ceph_backend
 
 
 def parse_args():
@@ -27,8 +27,12 @@ def parse_args():
         help='enable automatically scaling LR.')
     parser.add_argument(
         '--resume',
-        action='store_true',
-        help='resume from the latest checkpoint in the work_dir automatically')
+        nargs='?',
+        type=str,
+        const='auto',
+        help='If specify checkpoint path, resume from it, while if not '
+        'specify, try to auto resume from the latest checkpoint '
+        'in the work directory.')
     parser.add_argument(
         '--ceph', action='store_true', help='Use ceph as data storage backend')
     parser.add_argument(
@@ -46,7 +50,10 @@ def parse_args():
         choices=['none', 'pytorch', 'slurm', 'mpi'],
         default='none',
         help='job launcher')
-    parser.add_argument('--local_rank', type=int, default=0)
+    # When using PyTorch version >= 2.0.0, the `torch.distributed.launch`
+    # will pass the `--local-rank` parameter to `tools/train.py` instead
+    # of `--local_rank`.
+    parser.add_argument('--local_rank', '--local-rank', type=int, default=0)
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -55,9 +62,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-    # register all modules in mmdet3d into the registries
-    # do not init the default scope here because it will be init in the runner
-    register_all_modules(init_default_scope=False)
 
     # load config
     cfg = Config.fromfile(args.config)
@@ -105,7 +109,14 @@ def main():
                                '"auto_scale_lr.enable" or '
                                '"auto_scale_lr.base_batch_size" in your'
                                ' configuration file.')
-    cfg.resume = args.resume
+
+    # resume is determined in this priority: resume from > auto_resume
+    if args.resume == 'auto':
+        cfg.resume = True
+        cfg.load_from = None
+    elif args.resume is not None:
+        cfg.resume = True
+        cfg.load_from = args.resume
 
     # build the runner from config
     if 'runner_type' not in cfg:

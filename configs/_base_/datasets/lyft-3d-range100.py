@@ -8,6 +8,7 @@ class_names = [
 ]
 dataset_type = 'LyftDataset'
 data_root = 'data/lyft/'
+data_prefix = dict(pts='v1.01-train/lidar', img='', sweeps='v1.01-train/lidar')
 # Input modality for Lyft dataset, this is consistent with the submission
 # format which requires the information in input_modality.
 input_modality = dict(
@@ -16,19 +17,33 @@ input_modality = dict(
     use_radar=False,
     use_map=False,
     use_external=False)
-file_client_args = dict(backend='disk')
-# Uncomment the following if use ceph or other file clients.
-# See https://mmcv.readthedocs.io/en/latest/api.html#mmcv.fileio.FileClient
-# for more details.
-# file_client_args = dict(
+
+# Example to use different file client
+# Method 1: simply set the data root and let the file I/O module
+# automatically infer from prefix (not support LMDB and Memcache yet)
+
+# data_root = 's3://openmmlab/datasets/detection3d/lyft/'
+
+# Method 2: Use backend_args, file_client_args in versions before 1.1.0
+# backend_args = dict(
 #     backend='petrel',
 #     path_mapping=dict({
-#         './data/lyft/': 's3://lyft/lyft/',
-#         'data/lyft/': 's3://lyft/lyft/'
-#    }))
+#         './data/': 's3://openmmlab/datasets/detection3d/',
+#          'data/': 's3://openmmlab/datasets/detection3d/'
+#      }))
+backend_args = None
+
 train_pipeline = [
-    dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=5, use_dim=5),
-    dict(type='LoadPointsFromMultiSweeps', sweeps_num=10),
+    dict(
+        type='LoadPointsFromFile',
+        coord_type='LIDAR',
+        load_dim=5,
+        use_dim=5,
+        backend_args=backend_args),
+    dict(
+        type='LoadPointsFromMultiSweeps',
+        sweeps_num=10,
+        backend_args=backend_args),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
     dict(
         type='GlobalRotScaleTrans',
@@ -44,8 +59,16 @@ train_pipeline = [
         keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 test_pipeline = [
-    dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=5, use_dim=5),
-    dict(type='LoadPointsFromMultiSweeps', sweeps_num=10),
+    dict(
+        type='LoadPointsFromFile',
+        coord_type='LIDAR',
+        load_dim=5,
+        use_dim=5,
+        backend_args=backend_args),
+    dict(
+        type='LoadPointsFromMultiSweeps',
+        sweeps_num=10,
+        backend_args=backend_args),
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -66,40 +89,62 @@ test_pipeline = [
 # construct a pipeline for data and gt loading in show function
 # please keep its loading function consistent with test_pipeline (e.g. client)
 eval_pipeline = [
-    dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=5, use_dim=5),
-    dict(type='LoadPointsFromMultiSweeps', sweeps_num=10),
+    dict(
+        type='LoadPointsFromFile',
+        coord_type='LIDAR',
+        load_dim=5,
+        use_dim=5,
+        backend_args=backend_args),
+    dict(
+        type='LoadPointsFromMultiSweeps',
+        sweeps_num=10,
+        backend_args=backend_args),
     dict(type='Pack3DDetInputs', keys=['points'])
 ]
 
-data = dict(
-    samples_per_gpu=2,
-    workers_per_gpu=2,
-    train=dict(
+train_dataloader = dict(
+    batch_size=2,
+    num_workers=2,
+    persistent_workers=True,
+    sampler=dict(type='DefaultSampler', shuffle=True),
+    dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'lyft_infos_train.pkl',
+        ann_file='lyft_infos_train.pkl',
         pipeline=train_pipeline,
-        classes=class_names,
+        metainfo=dict(classes=class_names),
         modality=input_modality,
-        test_mode=False),
-    val=dict(
+        data_prefix=data_prefix,
+        test_mode=False,
+        box_type_3d='LiDAR',
+        backend_args=backend_args))
+val_dataloader = dict(
+    batch_size=1,
+    num_workers=1,
+    persistent_workers=True,
+    drop_last=False,
+    sampler=dict(type='DefaultSampler', shuffle=False),
+    dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'lyft_infos_val.pkl',
+        ann_file='lyft_infos_val.pkl',
         pipeline=test_pipeline,
-        classes=class_names,
+        metainfo=dict(classes=class_names),
         modality=input_modality,
-        test_mode=True),
-    test=dict(
-        type=dataset_type,
-        data_root=data_root,
-        ann_file=data_root + 'lyft_infos_test.pkl',
-        pipeline=test_pipeline,
-        classes=class_names,
-        modality=input_modality,
-        test_mode=True))
-# For Lyft dataset, we usually evaluate the model at the end of training.
-# Since the models are trained by 24 epochs by default, we set evaluation
-# interval to be 24. Please change the interval accordingly if you do not
-# use a default schedule.
-evaluation = dict(interval=24, pipeline=eval_pipeline)
+        test_mode=True,
+        data_prefix=data_prefix,
+        box_type_3d='LiDAR',
+        backend_args=backend_args))
+test_dataloader = val_dataloader
+
+val_evaluator = dict(
+    type='LyftMetric',
+    data_root=data_root,
+    ann_file='lyft_infos_val.pkl',
+    metric='bbox',
+    backend_args=backend_args)
+test_evaluator = val_evaluator
+
+vis_backends = [dict(type='LocalVisBackend')]
+visualizer = dict(
+    type='Det3DLocalVisualizer', vis_backends=vis_backends, name='visualizer')

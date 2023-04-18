@@ -9,7 +9,7 @@ from .s3dis_dataset import S3DISDataset, S3DISSegDataset
 from .scannet_dataset import (ScanNetDataset, ScanNetInstanceSegDataset,
                               ScanNetSegDataset)
 from .seg3d_dataset import Seg3DDataset
-from .semantickitti_dataset import SemanticKITTIDataset
+from .semantickitti_dataset import SemanticKittiDataset
 from .sunrgbd_dataset import SUNRGBDDataset
 from .suscape_dataset import SuscapeDataset
 # yapf: disable

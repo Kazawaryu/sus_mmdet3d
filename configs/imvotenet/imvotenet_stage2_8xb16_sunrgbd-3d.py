@@ -5,6 +5,7 @@ _base_ = [
 
 class_names = ('bed', 'table', 'sofa', 'chair', 'toilet', 'desk', 'dresser',
                'night_stand', 'bookshelf', 'bathtub')
+backend_args = None
 
 model = dict(
     pts_backbone=dict(
@@ -170,8 +171,9 @@ train_pipeline = [
         coord_type='DEPTH',
         shift_height=True,
         load_dim=6,
-        use_dim=[0, 1, 2]),
-    dict(type='LoadImageFromFile'),
+        use_dim=[0, 1, 2],
+        backend_args=backend_args),
+    dict(type='LoadImageFromFile', backend_args=backend_args),
     dict(
         type='LoadAnnotations3D',
         with_bbox=True,
@@ -198,13 +200,14 @@ train_pipeline = [
         ]))
 ]
 test_pipeline = [
-    dict(type='LoadImageFromFile'),
+    dict(type='LoadImageFromFile', backend_args=backend_args),
     dict(
         type='LoadPointsFromFile',
         coord_type='DEPTH',
         shift_height=True,
         load_dim=6,
-        use_dim=[0, 1, 2]),
+        use_dim=[0, 1, 2],
+        backend_args=backend_args),
     dict(type='Resize', scale=(1333, 600), keep_ratio=True),
     dict(type='PointSample', num_points=20000),
     dict(type='Pack3DDetInputs', keys=['img', 'points'])
@@ -216,9 +219,10 @@ val_dataloader = dict(dataset=dict(pipeline=test_pipeline))
 test_dataloader = dict(dataset=dict(pipeline=test_pipeline))
 
 # may also use your own pre-trained image branch
-load_from = 'https://download.openmmlab.com/mmdetection3d/v0.1.0_models/imvotenet/imvotenet_faster_rcnn_r50_fpn_2x4_sunrgbd-3d-10class/imvotenet_faster_rcnn_r50_fpn_2x4_sunrgbd-3d-10class_20210323_173222-cad62aeb.pth'  # noqa
+load_from = 'https://download.openmmlab.com/mmdetection3d/v1.0.0_models/imvotenet/imvotenet_faster_rcnn_r50_fpn_2x4_sunrgbd-3d-10class/imvotenet_faster_rcnn_r50_fpn_2x4_sunrgbd-3d-10class_20210819_225618-62eba6ce.pth'  # noqa
 # Default setting for scaling LR automatically
 #   - `enable` means enable scaling LR automatically
 #       or not by default.
 #   - `base_batch_size` = (8 GPUs) x (16 samples per GPU).
 auto_scale_lr = dict(enable=False, base_batch_size=128)
+randomness = dict(seed=8)

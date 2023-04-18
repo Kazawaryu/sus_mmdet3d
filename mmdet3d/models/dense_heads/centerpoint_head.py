@@ -471,7 +471,7 @@ class CenterHead(BaseModule):
             (gt_bboxes_3d.gravity_center, gt_bboxes_3d.tensor[:, 3:]),
             dim=1).to(device)
         max_objs = self.train_cfg['max_objs'] * self.train_cfg['dense_reg']
-        grid_size = torch.tensor(self.train_cfg['grid_size'])
+        grid_size = torch.tensor(self.train_cfg['grid_size']).to(device)
         pc_range = torch.tensor(self.train_cfg['point_cloud_range'])
         voxel_size = torch.tensor(self.train_cfg['voxel_size'])
 
@@ -519,16 +519,16 @@ class CenterHead(BaseModule):
             for k in range(num_objs):
                 cls_id = task_classes[idx][k] - 1
 
-                width = task_boxes[idx][k][3]
-                length = task_boxes[idx][k][4]
-                width = width / voxel_size[0] / self.train_cfg[
+                length = task_boxes[idx][k][3]
+                width = task_boxes[idx][k][4]
+                length = length / voxel_size[0] / self.train_cfg[
                     'out_size_factor']
-                length = length / voxel_size[1] / self.train_cfg[
+                width = width / voxel_size[1] / self.train_cfg[
                     'out_size_factor']
 
                 if width > 0 and length > 0:
                     radius = gaussian_radius(
-                        (length, width),
+                        (width, length),
                         min_overlap=self.train_cfg['gaussian_overlap'])
                     radius = max(self.train_cfg['min_radius'], int(radius))
 
