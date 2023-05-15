@@ -3,8 +3,10 @@ _base_ = [
     '../_base_/models/imvotenet.py'
 ]
 
+backend_args = None
+
 train_pipeline = [
-    dict(type='LoadImageFromFile'),
+    dict(type='LoadImageFromFile', backend_args=backend_args),
     dict(
         type='LoadAnnotations3D',
         with_bbox=True,
@@ -22,14 +24,7 @@ train_pipeline = [
 ]
 
 test_pipeline = [
-    dict(type='LoadImageFromFile'),
-    # online evaluation
-    dict(
-        type='LoadAnnotations3D',
-        with_bbox=True,
-        with_label=True,
-        with_bbox_3d=False,
-        with_label_3d=False),
+    dict(type='LoadImageFromFile', backend_args=backend_args),
     dict(type='Resize', scale=(1333, 600), keep_ratio=True),
     dict(
         type='Pack3DDetInputs',
@@ -64,6 +59,7 @@ param_scheduler = [
         gamma=0.1)
 ]
 val_evaluator = dict(type='Indoor2DMetric')
+test_evaluator = val_evaluator
 
 # optimizer
 optim_wrapper = dict(

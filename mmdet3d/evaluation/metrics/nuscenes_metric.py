@@ -1,5 +1,4 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import logging
 import tempfile
 from os import path as osp
 from typing import Dict, List, Optional, Sequence, Tuple, Union
@@ -28,22 +27,27 @@ class NuScenesMetric(BaseMetric):
     Args:
         data_root (str): Path of dataset root.
         ann_file (str): Path of annotation file.
-        metric (str | list[str]): Metrics to be evaluated.
-            Default to 'bbox'.
-        modality (dict): Modality to specify the sensor data used
-            as input. Defaults to dict(use_camera=False, use_lidar=True).
+        metric (str or List[str]): Metrics to be evaluated. Defaults to 'bbox'.
+        modality (dict): Modality to specify the sensor data used as input.
+            Defaults to dict(use_camera=False, use_lidar=True).
         prefix (str, optional): The prefix that will be added in the metric
             names to disambiguate homonymous metrics of different evaluators.
-            If prefix is not provided in the argument, self.default_prefix
-            will be used instead. Defaults to None.
-        jsonfile_prefix (str, optional): The prefix of json files including
-            the file path and the prefix of filename, e.g., "a/b/prefix".
-            If not specified, a temp file will be created. Default: None.
+            If prefix is not provided in the argument, self.default_prefix will
+            be used instead. Defaults to None.
+        format_only (bool): Format the output results without perform
+            evaluation. It is useful when you want to format the result to a
+            specific format and submit it to the test server.
+            Defaults to False.
+        jsonfile_prefix (str, optional): The prefix of json files including the
+            file path and the prefix of filename, e.g., "a/b/prefix".
+            If not specified, a temp file will be created. Defaults to None.
         eval_version (str): Configuration version of evaluation.
-            Defaults to  'detection_cvpr_2019'.
-        collect_device (str): Device name used for collecting results
-            from different ranks during distributed training. Must be 'cpu' or
+            Defaults to 'detection_cvpr_2019'.
+        collect_device (str): Device name used for collecting results from
+            different ranks during distributed training. Must be 'cpu' or
             'gpu'. Defaults to 'cpu'.
+        backend_args (dict, optional): Arguments to instantiate the
+            corresponding backend. Defaults to None.
     """
     NameMapping = {
         'movable_object.barrier': 'barrier',
@@ -82,18 +86,17 @@ class NuScenesMetric(BaseMetric):
         'attr_err': 'mAAE'
     }
 
-    def __init__(
-        self,
-        data_root: str,
-        ann_file: str,
-        metric: Union[str, List[str]] = 'bbox',
-        modality: Dict = dict(use_camera=False, use_lidar=True),
-        prefix: Optional[str] = None,
-        jsonfile_prefix: Optional[str] = None,
-        eval_version: str = 'detection_cvpr_2019',
-        collect_device: str = 'cpu',
-        file_client_args: dict = dict(backend='disk')
-    ) -> None:
+    def __init__(self,
+                 data_root: str,
+                 ann_file: str,
+                 metric: Union[str, List[str]] = 'bbox',
+                 modality: dict = dict(use_camera=False, use_lidar=True),
+                 prefix: Optional[str] = None,
+                 format_only: bool = False,
+                 jsonfile_prefix: Optional[str] = None,
+                 eval_version: str = 'detection_cvpr_2019',
+                 collect_device: str = 'cpu',
+                 backend_args: Optional[dict] = None) -> None:
         self.default_prefix = 'NuScenes metric'
         super(NuScenesMetric, self).__init__(
             collect_device=collect_device, prefix=prefix)
@@ -105,8 +108,14 @@ class NuScenesMetric(BaseMetric):
         self.ann_file = ann_file
         self.data_root = data_root
         self.modality = modality
+        self.format_only = format_only
+        if self.format_only:
+            assert jsonfile_prefix is not None, 'jsonfile_prefix must be not '
+            'None when format_only is True, otherwise the result files will '
+            'be saved to a temp directory which will be cleanup at the end.'
+
         self.jsonfile_prefix = jsonfile_prefix
-        self.file_client_args = file_client_args
+        self.backend_args = backend_args
 
         self.metrics = metric if isinstance(metric, list) else [metric]
 
@@ -116,14 +125,12 @@ class NuScenesMetric(BaseMetric):
     def process(self, data_batch: dict, data_samples: Sequence[dict]) -> None:
         """Process one batch of data samples and predictions.
 
-        The processed results should be stored in ``self.results``,
-        which will be used to compute the metrics when all batches
-        have been processed.
+        The processed results should be stored in ``self.results``, which will
+        be used to compute the metrics when all batches have been processed.
 
         Args:
             data_batch (dict): A batch of data from the dataloader.
-            data_samples (Sequence[dict]): A batch of outputs from
-                the model.
+            data_samples (Sequence[dict]): A batch of outputs from the model.
         """
         for data_sample in data_samples:
             result = dict()
@@ -137,13 +144,13 @@ class NuScenesMetric(BaseMetric):
             result['pred_instances'] = pred_2d
             sample_idx = data_sample['sample_idx']
             result['sample_idx'] = sample_idx
-        self.results.append(result)
+            self.results.append(result)
 
-    def compute_metrics(self, results: list) -> Dict[str, float]:
+    def compute_metrics(self, results: List[dict]) -> Dict[str, float]:
         """Compute the metrics from processed results.
 
         Args:
-            results (list): The processed results of each batch.
+            results (List[dict]): The processed results of each batch.
 
         Returns:
             Dict[str, float]: The computed metrics. The keys are the names of
@@ -155,11 +162,17 @@ class NuScenesMetric(BaseMetric):
         self.version = self.dataset_meta['version']
         # load annotations
         self.data_infos = load(
-            self.ann_file, file_client_args=self.file_client_args)['data_list']
+            self.ann_file, backend_args=self.backend_args)['data_list']
         result_dict, tmp_dir = self.format_results(results, classes,
                                                    self.jsonfile_prefix)
 
         metric_dict = {}
+
+        if self.format_only:
+            logger.info(
+                f'results are saved in {osp.basename(self.jsonfile_prefix)}')
+            return metric_dict
+
         for metric in self.metrics:
             ap_dict = self.nus_evaluate(
                 result_dict, classes=classes, metric=metric, logger=logger)
@@ -173,46 +186,45 @@ class NuScenesMetric(BaseMetric):
     def nus_evaluate(self,
                      result_dict: dict,
                      metric: str = 'bbox',
-                     classes: List[str] = None,
-                     logger: logging.Logger = None) -> dict:
+                     classes: Optional[List[str]] = None,
+                     logger: Optional[MMLogger] = None) -> Dict[str, float]:
         """Evaluation in Nuscenes protocol.
 
         Args:
             result_dict (dict): Formatted results of the dataset.
-            metric (str): Metrics to be evaluated.
-                Default: None.
-            classes (list[String], optional): A list of class name. Defaults
-                to None.
-            logger (MMLogger, optional): Logger used for printing
-                related information during evaluation. Default: None.
+            metric (str): Metrics to be evaluated. Defaults to 'bbox'.
+            classes (List[str], optional): A list of class name.
+                Defaults to None.
+            logger (MMLogger, optional): Logger used for printing related
+                information during evaluation. Defaults to None.
 
         Returns:
-            dict[str, float]: Results of each evaluation metric.
+            Dict[str, float]: Results of each evaluation metric.
         """
         metric_dict = dict()
         for name in result_dict:
             print(f'Evaluating bboxes of {name}')
             ret_dict = self._evaluate_single(
                 result_dict[name], classes=classes, result_name=name)
-        metric_dict.update(ret_dict)
+            metric_dict.update(ret_dict)
         return metric_dict
 
-    def _evaluate_single(self,
-                         result_path: str,
-                         classes: List[None] = None,
-                         result_name: str = 'pred_instances_3d') -> dict:
+    def _evaluate_single(
+            self,
+            result_path: str,
+            classes: Optional[List[str]] = None,
+            result_name: str = 'pred_instances_3d') -> Dict[str, float]:
         """Evaluation for a single model in nuScenes protocol.
 
         Args:
             result_path (str): Path of the result file.
-                Default: 'bbox'.
-            classes (list[String], optional): A list of class name. Defaults
-                to None.
+            classes (List[str], optional): A list of class name.
+                Defaults to None.
             result_name (str): Result name in the metric prefix.
-                Default: 'pred_instances_3d'.
+                Defaults to 'pred_instances_3d'.
 
         Returns:
-            dict: Dictionary of evaluation details.
+            Dict[str, float]: Dictionary of evaluation details.
         """
         from nuscenes import NuScenes
         from nuscenes.eval.detection.evaluate import NuScenesEval
@@ -239,39 +251,41 @@ class NuScenesMetric(BaseMetric):
         metric_prefix = f'{result_name}_NuScenes'
         for name in classes:
             for k, v in metrics['label_aps'][name].items():
-                val = float('{:.4f}'.format(v))
+                val = float(f'{v:.4f}')
                 detail[f'{metric_prefix}/{name}_AP_dist_{k}'] = val
             for k, v in metrics['label_tp_errors'][name].items():
-                val = float('{:.4f}'.format(v))
+                val = float(f'{v:.4f}')
                 detail[f'{metric_prefix}/{name}_{k}'] = val
             for k, v in metrics['tp_errors'].items():
-                val = float('{:.4f}'.format(v))
+                val = float(f'{v:.4f}')
                 detail[f'{metric_prefix}/{self.ErrNameMapping[k]}'] = val
 
         detail[f'{metric_prefix}/NDS'] = metrics['nd_score']
         detail[f'{metric_prefix}/mAP'] = metrics['mean_ap']
         return detail
 
-    def format_results(self,
-                       results: List[dict],
-                       classes: List[str] = None,
-                       jsonfile_prefix: str = None) -> Tuple:
+    def format_results(
+        self,
+        results: List[dict],
+        classes: Optional[List[str]] = None,
+        jsonfile_prefix: Optional[str] = None
+    ) -> Tuple[dict, Union[tempfile.TemporaryDirectory, None]]:
         """Format the mmdet3d results to standard NuScenes json file.
 
         Args:
-            results (list[dict]): Testing results of the dataset.
-            classes (list[String], optional): A list of class name. Defaults
-                to None.
+            results (List[dict]): Testing results of the dataset.
+            classes (List[str], optional): A list of class name.
+                Defaults to None.
             jsonfile_prefix (str, optional): The prefix of json files. It
                 includes the file path and the prefix of filename, e.g.,
                 "a/b/prefix". If not specified, a temp file will be created.
-                Default: None.
+                Defaults to None.
 
         Returns:
-            tuple: Returns (result_dict, tmp_dir), where `result_dict` is a
-                dict containing the json filepaths, `tmp_dir` is the temporal
-                directory created for saving json files when
-                `jsonfile_prefix` is not specified.
+            tuple: Returns (result_dict, tmp_dir), where ``result_dict`` is a
+            dict containing the json filepaths, ``tmp_dir`` is the temporal
+            directory created for saving json files when ``jsonfile_prefix`` is
+            not specified.
         """
         assert isinstance(results, list), 'results must be a list'
 
@@ -281,7 +295,7 @@ class NuScenesMetric(BaseMetric):
         else:
             tmp_dir = None
         result_dict = dict()
-        sample_id_list = [result['sample_idx'] for result in results]
+        sample_idx_list = [result['sample_idx'] for result in results]
 
         for name in results[0]:
             if 'pred' in name and '3d' in name and name[0] != '_':
@@ -291,20 +305,20 @@ class NuScenesMetric(BaseMetric):
                 box_type_3d = type(results_[0]['bboxes_3d'])
                 if box_type_3d == LiDARInstance3DBoxes:
                     result_dict[name] = self._format_lidar_bbox(
-                        results_, sample_id_list, classes, tmp_file_)
+                        results_, sample_idx_list, classes, tmp_file_)
                 elif box_type_3d == CameraInstance3DBoxes:
                     result_dict[name] = self._format_camera_bbox(
-                        results_, sample_id_list, classes, tmp_file_)
+                        results_, sample_idx_list, classes, tmp_file_)
 
         return result_dict, tmp_dir
 
-    def get_attr_name(self, attr_idx, label_name):
+    def get_attr_name(self, attr_idx: int, label_name: str) -> str:
         """Get attribute from predicted index.
 
         This is a workaround to predict attribute when the predicted velocity
-        is not reliable. We map the predicted attribute index to the one
-        in the attribute set. If it is consistent with the category, we will
-        keep it. Otherwise, we will use the default attribute.
+        is not reliable. We map the predicted attribute index to the one in the
+        attribute set. If it is consistent with the category, we will keep it.
+        Otherwise, we will use the default attribute.
 
         Args:
             attr_idx (int): Attribute index.
@@ -347,16 +361,19 @@ class NuScenesMetric(BaseMetric):
 
     def _format_camera_bbox(self,
                             results: List[dict],
-                            sample_id_list: List[int],
-                            classes: List[str] = None,
-                            jsonfile_prefix: str = None) -> str:
+                            sample_idx_list: List[int],
+                            classes: Optional[List[str]] = None,
+                            jsonfile_prefix: Optional[str] = None) -> str:
         """Convert the results to the standard format.
 
         Args:
-            results (list[dict]): Testing results of the dataset.
-            jsonfile_prefix (str): The prefix of the output jsonfile.
-                You can specify the output directory/filename by
-                modifying the jsonfile_prefix. Default: None.
+            results (List[dict]): Testing results of the dataset.
+            sample_idx_list (List[int]): List of result sample idx.
+            classes (List[str], optional): A list of class name.
+                Defaults to None.
+            jsonfile_prefix (str, optional): The prefix of the output jsonfile.
+                You can specify the output directory/filename by modifying the
+                jsonfile_prefix. Defaults to None.
 
         Returns:
             str: Path of the output json file.
@@ -379,10 +396,10 @@ class NuScenesMetric(BaseMetric):
 
         for i, det in enumerate(mmengine.track_iter_progress(results)):
 
-            sample_id = sample_id_list[i]
+            sample_idx = sample_idx_list[i]
 
-            frame_sample_id = sample_id // CAM_NUM
-            camera_type_id = sample_id % CAM_NUM
+            frame_sample_idx = sample_idx // CAM_NUM
+            camera_type_id = sample_idx % CAM_NUM
 
             if camera_type_id == 0:
                 boxes_per_frame = []
@@ -391,17 +408,17 @@ class NuScenesMetric(BaseMetric):
             # need to merge results from images of the same sample
             annos = []
             boxes, attrs = output_to_nusc_box(det)
-            sample_token = self.data_infos[frame_sample_id]['token']
+            sample_token = self.data_infos[frame_sample_idx]['token']
             camera_type = camera_types[camera_type_id]
             boxes, attrs = cam_nusc_box_to_global(
-                self.data_infos[frame_sample_id], boxes, attrs, classes,
+                self.data_infos[frame_sample_idx], boxes, attrs, classes,
                 self.eval_detection_configs, camera_type)
             boxes_per_frame.extend(boxes)
             attrs_per_frame.extend(attrs)
             # Remove redundant predictions caused by overlap of images
-            if (sample_id + 1) % CAM_NUM != 0:
+            if (sample_idx + 1) % CAM_NUM != 0:
                 continue
-            boxes = global_nusc_box_to_cam(self.data_infos[frame_sample_id],
+            boxes = global_nusc_box_to_cam(self.data_infos[frame_sample_idx],
                                            boxes_per_frame, classes,
                                            self.eval_detection_configs)
             cam_boxes3d, scores, labels = nusc_box_to_cam_box3d(boxes)
@@ -432,7 +449,7 @@ class NuScenesMetric(BaseMetric):
             det = bbox3d2result(cam_boxes3d, scores, labels, attrs)
             boxes, attrs = output_to_nusc_box(det)
             boxes, attrs = cam_nusc_box_to_global(
-                self.data_infos[frame_sample_id], boxes, attrs, classes,
+                self.data_infos[frame_sample_idx], boxes, attrs, classes,
                 self.eval_detection_configs)
 
             for i, box in enumerate(boxes):
@@ -461,25 +478,25 @@ class NuScenesMetric(BaseMetric):
 
         mmengine.mkdir_or_exist(jsonfile_prefix)
         res_path = osp.join(jsonfile_prefix, 'results_nusc.json')
-        print('Results writes to', res_path)
+        print(f'Results writes to {res_path}')
         mmengine.dump(nusc_submissions, res_path)
         return res_path
 
     def _format_lidar_bbox(self,
                            results: List[dict],
-                           sample_id_list: List[int],
-                           classes: List[str] = None,
-                           jsonfile_prefix: str = None) -> str:
+                           sample_idx_list: List[int],
+                           classes: Optional[List[str]] = None,
+                           jsonfile_prefix: Optional[str] = None) -> str:
         """Convert the results to the standard format.
 
         Args:
-            results (list[dict]): Testing results of the dataset.
-            sample_id_list (list[int]): List of result sample id.
-            classes (list[String], optional): A list of class name. Defaults
-                to None.
+            results (List[dict]): Testing results of the dataset.
+            sample_idx_list (List[int]): List of result sample idx.
+            classes (List[str], optional): A list of class name.
+                Defaults to None.
             jsonfile_prefix (str, optional): The prefix of the output jsonfile.
-                You can specify the output directory/filename by
-                modifying the jsonfile_prefix. Default: None.
+                You can specify the output directory/filename by modifying the
+                jsonfile_prefix. Defaults to None.
 
         Returns:
             str: Path of the output json file.
@@ -490,10 +507,10 @@ class NuScenesMetric(BaseMetric):
         for i, det in enumerate(mmengine.track_iter_progress(results)):
             annos = []
             boxes, attrs = output_to_nusc_box(det)
-            sample_id = sample_id_list[i]
-            sample_token = self.data_infos[sample_id]['token']
-            boxes = lidar_nusc_box_to_global(self.data_infos[sample_id], boxes,
-                                             classes,
+            sample_idx = sample_idx_list[i]
+            sample_token = self.data_infos[sample_idx]['token']
+            boxes = lidar_nusc_box_to_global(self.data_infos[sample_idx],
+                                             boxes, classes,
                                              self.eval_detection_configs)
             for i, box in enumerate(boxes):
                 name = classes[box.label]
@@ -535,12 +552,13 @@ class NuScenesMetric(BaseMetric):
         }
         mmengine.mkdir_or_exist(jsonfile_prefix)
         res_path = osp.join(jsonfile_prefix, 'results_nusc.json')
-        print('Results writes to', res_path)
+        print(f'Results writes to {res_path}')
         mmengine.dump(nusc_submissions, res_path)
         return res_path
 
 
-def output_to_nusc_box(detection: dict) -> List[NuScenesBox]:
+def output_to_nusc_box(
+        detection: dict) -> Tuple[List[NuScenesBox], Union[np.ndarray, None]]:
     """Convert the output to the box class in the nuScenes.
 
     Args:
@@ -551,7 +569,8 @@ def output_to_nusc_box(detection: dict) -> List[NuScenesBox]:
             - labels_3d (torch.Tensor): Predicted box labels.
 
     Returns:
-        list[:obj:`NuScenesBox`]: List of standard NuScenesBoxes.
+        Tuple[List[:obj:`NuScenesBox`], np.ndarray or None]: List of standard
+        NuScenesBoxes and attribute labels.
     """
     bbox3d = detection['bboxes_3d']
     scores = detection['scores_3d'].numpy()
@@ -566,7 +585,7 @@ def output_to_nusc_box(detection: dict) -> List[NuScenesBox]:
 
     box_list = []
 
-    if type(bbox3d) == LiDARInstance3DBoxes:
+    if isinstance(bbox3d, LiDARInstance3DBoxes):
         # our LiDAR coordinate system -> nuScenes box coordinate system
         nus_box_dims = box_dims[:, [1, 0, 2]]
         for i in range(len(bbox3d)):
@@ -584,7 +603,7 @@ def output_to_nusc_box(detection: dict) -> List[NuScenesBox]:
                 score=scores[i],
                 velocity=velocity)
             box_list.append(box)
-    elif type(bbox3d) == CameraInstance3DBoxes:
+    elif isinstance(bbox3d, CameraInstance3DBoxes):
         # our Camera coordinate system -> nuScenes box coordinate system
         # convert the dim/rot to nuscbox convention
         nus_box_dims = box_dims[:, [2, 0, 1]]
@@ -605,7 +624,7 @@ def output_to_nusc_box(detection: dict) -> List[NuScenesBox]:
             box_list.append(box)
     else:
         raise NotImplementedError(
-            f'Do not support convert {type(bbox3d)} bboxes'
+            f'Do not support convert {type(bbox3d)} bboxes '
             'to standard NuScenesBoxes.')
 
     return box_list, attrs
@@ -617,15 +636,15 @@ def lidar_nusc_box_to_global(
     """Convert the box from ego to global coordinate.
 
     Args:
-        info (dict): Info for a specific sample data, including the
-            calibration information.
-        boxes (list[:obj:`NuScenesBox`]): List of predicted NuScenesBoxes.
-        classes (list[str]): Mapped classes in the evaluation.
-        eval_configs (object): Evaluation configuration object.
+        info (dict): Info for a specific sample data, including the calibration
+            information.
+        boxes (List[:obj:`NuScenesBox`]): List of predicted NuScenesBoxes.
+        classes (List[str]): Mapped classes in the evaluation.
+        eval_configs (:obj:`DetectionConfig`): Evaluation configuration object.
 
     Returns:
-        list: List of standard NuScenesBoxes in the global
-            coordinate.
+        List[:obj:`DetectionConfig`]: List of standard NuScenesBoxes in the
+        global coordinate.
     """
     box_list = []
     for box in boxes:
@@ -652,25 +671,25 @@ def lidar_nusc_box_to_global(
 def cam_nusc_box_to_global(
     info: dict,
     boxes: List[NuScenesBox],
-    attrs: List[str],
+    attrs: np.ndarray,
     classes: List[str],
     eval_configs: DetectionConfig,
     camera_type: str = 'CAM_FRONT',
-) -> List[NuScenesBox]:
+) -> Tuple[List[NuScenesBox], List[int]]:
     """Convert the box from camera to global coordinate.
 
     Args:
-        info (dict): Info for a specific sample data, including the
-            calibration information.
-        boxes (list[:obj:`NuScenesBox`]): List of predicted NuScenesBoxes.
-        attrs (list[str]): List of attributes.
-        camera_type (str): Type of camera.
-        classes (list[str]): Mapped classes in the evaluation.
-        eval_configs (object): Evaluation configuration object.
+        info (dict): Info for a specific sample data, including the calibration
+            information.
+        boxes (List[:obj:`NuScenesBox`]): List of predicted NuScenesBoxes.
+        attrs (np.ndarray): Predicted attributes.
+        classes (List[str]): Mapped classes in the evaluation.
+        eval_configs (:obj:`DetectionConfig`): Evaluation configuration object.
+        camera_type (str): Type of camera. Defaults to 'CAM_FRONT'.
 
     Returns:
-        list: List of standard NuScenesBoxes in the global
-            coordinate.
+        Tuple[List[:obj:`NuScenesBox`], List[int]]: List of standard
+        NuScenesBoxes in the global coordinate and attribute label.
     """
     box_list = []
     attr_list = []
@@ -702,15 +721,15 @@ def global_nusc_box_to_cam(info: dict, boxes: List[NuScenesBox],
     """Convert the box from global to camera coordinate.
 
     Args:
-        info (dict): Info for a specific sample data, including the
-            calibration information.
-        boxes (list[:obj:`NuScenesBox`]): List of predicted NuScenesBoxes.
-        classes (list[str]): Mapped classes in the evaluation.
-        eval_configs (object): Evaluation configuration object.
+        info (dict): Info for a specific sample data, including the calibration
+            information.
+        boxes (List[:obj:`NuScenesBox`]): List of predicted NuScenesBoxes.
+        classes (List[str]): Mapped classes in the evaluation.
+        eval_configs (:obj:`DetectionConfig`): Evaluation configuration object.
 
     Returns:
-        list: List of standard NuScenesBoxes in the global
-            coordinate.
+        List[:obj:`NuScenesBox`]: List of standard NuScenesBoxes in camera
+        coordinate.
     """
     box_list = []
     for box in boxes:
@@ -736,15 +755,17 @@ def global_nusc_box_to_cam(info: dict, boxes: List[NuScenesBox],
     return box_list
 
 
-def nusc_box_to_cam_box3d(boxes: List[NuScenesBox]):
+def nusc_box_to_cam_box3d(
+    boxes: List[NuScenesBox]
+) -> Tuple[CameraInstance3DBoxes, torch.Tensor, torch.Tensor]:
     """Convert boxes from :obj:`NuScenesBox` to :obj:`CameraInstance3DBoxes`.
 
     Args:
-        boxes (list[:obj:`NuScenesBox`]): List of predicted NuScenesBoxes.
+        boxes (:obj:`List[NuScenesBox]`): List of predicted NuScenesBoxes.
 
     Returns:
-        tuple (:obj:`CameraInstance3DBoxes` | torch.Tensor | torch.Tensor):
-            Converted 3D bounding boxes, scores and labels.
+        Tuple[:obj:`CameraInstance3DBoxes`, torch.Tensor, torch.Tensor]:
+        Converted 3D bounding boxes, scores and labels.
     """
     locs = torch.Tensor([b.center for b in boxes]).view(-1, 3)
     dims = torch.Tensor([b.wlh for b in boxes]).view(-1, 3)

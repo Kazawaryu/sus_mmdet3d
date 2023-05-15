@@ -16,12 +16,12 @@ class TestLoadPointsFromFile(unittest.TestCase):
 
     def test_load_points_from_file(self):
         use_dim = 3
-        file_client_args = dict(backend='disk')
+        backend_args = None
         load_points_transform = LoadPointsFromFile(
             coord_type='LIDAR',
             load_dim=4,
             use_dim=use_dim,
-            file_client_args=file_client_args)
+            backend_args=backend_args)
         data_info = create_dummy_data_info()
         info = load_points_transform(data_info)
         self.assertIn('points', info)
@@ -30,7 +30,7 @@ class TestLoadPointsFromFile(unittest.TestCase):
             coord_type='DEPTH',
             load_dim=4,
             use_dim=use_dim,
-            file_client_args=file_client_args)
+            backend_args=backend_args)
         info = load_points_transform(data_info)
         self.assertIsInstance(info['points'], DepthPoints)
         self.assertEqual(info['points'].shape[-1], use_dim)
@@ -39,7 +39,7 @@ class TestLoadPointsFromFile(unittest.TestCase):
             load_dim=4,
             use_dim=use_dim,
             shift_height=True,
-            file_client_args=file_client_args)
+            backend_args=backend_args)
         info = load_points_transform(data_info)
         # extra height dim
         self.assertEqual(info['points'].shape[-1], use_dim + 1)
@@ -53,12 +53,16 @@ class TestLoadPointsFromFile(unittest.TestCase):
 class TestLoadAnnotations3D(unittest.TestCase):
 
     def test_load_points_from_file(self):
-        file_client_args = dict(backend='disk')
+        backend_args = None
 
         load_anns_transform = LoadAnnotations3D(
             with_bbox_3d=True,
             with_label_3d=True,
-            file_client_args=file_client_args)
+            with_panoptic_3d=True,
+            seg_offset=2**16,
+            dataset_type='semantickitti',
+            seg_3d_dtype='np.uint32',
+            backend_args=backend_args)
         self.assertIs(load_anns_transform.with_seg, False)
         self.assertIs(load_anns_transform.with_bbox_3d, True)
         self.assertIs(load_anns_transform.with_label_3d, True)
@@ -69,10 +73,29 @@ class TestLoadAnnotations3D(unittest.TestCase):
                         torch.tensor(7.2650))
         self.assertIn('gt_labels_3d', info)
         assert_allclose(info['gt_labels_3d'], torch.tensor([1]))
+        self.assertIn('pts_semantic_mask', info)
+        self.assertIn('pts_instance_mask', info)
+        assert_allclose(
+            info['pts_semantic_mask'],
+            np.array([
+                50, 50, 50, 70, 70, 50, 0, 50, 70, 50, 50, 70, 71, 52, 70, 50,
+                50, 50, 50, 0, 50, 50, 50, 50, 50, 70, 50, 71, 50, 70, 70, 80,
+                50, 70, 70, 70, 71, 70, 50, 50, 70, 50, 80, 70, 50, 70, 50, 70,
+                70, 50
+            ]))
+        assert_allclose(
+            info['pts_instance_mask'],
+            np.array([
+                50, 50, 50, 70, 70, 50, 0, 50, 70, 50, 50, 70, 71, 52, 70, 50,
+                50, 50, 50, 0, 50, 50, 50, 50, 50, 70, 50, 71, 50, 70, 70, 80,
+                50, 70, 70, 70, 71, 70, 50, 50, 70, 50, 80, 70, 50, 70, 50, 70,
+                70, 50
+            ]))
         repr_str = repr(load_anns_transform)
         self.assertIn('with_bbox_3d=True', repr_str)
         self.assertIn('with_label_3d=True', repr_str)
         self.assertIn('with_bbox_depth=False', repr_str)
+        self.assertIn('with_panoptic_3d=True', repr_str)
 
 
 class TestPointSegClassMapping(unittest.TestCase):

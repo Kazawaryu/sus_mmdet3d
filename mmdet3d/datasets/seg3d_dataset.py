@@ -2,9 +2,9 @@
 from os import path as osp
 from typing import Callable, List, Optional, Sequence, Union
 
-import mmengine
 import numpy as np
 from mmengine.dataset import BaseDataset
+from mmengine.fileio import get_local_path
 
 from mmdet3d.registry import DATASETS
 
@@ -49,8 +49,8 @@ class Seg3DDataset(BaseDataset):
         load_eval_anns (bool): Whether to load annotations in test_mode,
             the annotation will be save in `eval_ann_infos`, which can be used
             in Evaluator. Defaults to True.
-        file_client_args (dict): Configuration of file client.
-            Defaults to dict(backend='disk').
+        backend_args (dict, optional): Arguments to instantiate the
+            corresponding backend. Defaults to None.
     """
     METAINFO = {
         'classes': None,  # names of all classes data used for the task
@@ -75,10 +75,9 @@ class Seg3DDataset(BaseDataset):
                  test_mode: bool = False,
                  serialize_data: bool = False,
                  load_eval_anns: bool = True,
-                 file_client_args: dict = dict(backend='disk'),
+                 backend_args: Optional[dict] = None,
                  **kwargs) -> None:
-        # init file client
-        self.file_client = mmengine.FileClient(**file_client_args)
+        self.backend_args = backend_args
         self.modality = modality
         self.load_eval_anns = load_eval_anns
 
@@ -107,14 +106,7 @@ class Seg3DDataset(BaseDataset):
         metainfo['palette'] = updated_palette
 
         # construct seg_label_mapping for semantic mask
-        seg_max_cat_id = len(self.METAINFO['seg_all_class_ids'])
-        seg_valid_cat_ids = self.METAINFO['seg_valid_class_ids']
-        neg_label = len(seg_valid_cat_ids)
-        seg_label_mapping = np.ones(
-            seg_max_cat_id + 1, dtype=np.int) * neg_label
-        for cls_idx, cat_id in enumerate(seg_valid_cat_ids):
-            seg_label_mapping[cat_id] = cls_idx
-        self.seg_label_mapping = seg_label_mapping
+        self.seg_label_mapping = self.get_seg_label_mapping(metainfo)
 
         super().__init__(
             ann_file=ann_file,
@@ -192,6 +184,29 @@ class Seg3DDataset(BaseDataset):
 
         return label_mapping, label2cat, valid_class_ids
 
+    def get_seg_label_mapping(self, metainfo=None):
+        """Get segmentation label mapping.
+
+        The ``seg_label_mapping`` is an array, its indices are the old label
+        ids and its values are the new label ids, and is specifically used
+        for changing point labels in PointSegClassMapping.
+
+        Args:
+            metainfo (dict, optional): Meta information to set
+            seg_label_mapping. Defaults to None.
+
+        Returns:
+            tuple: The mapping from old classes to new classes.
+        """
+        seg_max_cat_id = len(self.METAINFO['seg_all_class_ids'])
+        seg_valid_cat_ids = self.METAINFO['seg_valid_class_ids']
+        neg_label = len(seg_valid_cat_ids)
+        seg_label_mapping = np.ones(
+            seg_max_cat_id + 1, dtype=np.int64) * neg_label
+        for cls_idx, cat_id in enumerate(seg_valid_cat_ids):
+            seg_label_mapping[cat_id] = cls_idx
+        return seg_label_mapping
+
     def _update_palette(self, new_classes: list, palette: Union[None,
                                                                 list]) -> list:
         """Update palette according to metainfo.
@@ -240,6 +255,9 @@ class Seg3DDataset(BaseDataset):
                 osp.join(
                     self.data_prefix.get('pts', ''),
                     info['lidar_points']['lidar_path'])
+            if 'num_pts_feats' in info['lidar_points']:
+                info['num_pts_feats'] = info['lidar_points']['num_pts_feats']
+            info['lidar_path'] = info['lidar_points']['lidar_path']
 
         if self.modality['use_camera']:
             for cam_id, img_info in info['images'].items():
@@ -267,6 +285,24 @@ class Seg3DDataset(BaseDataset):
 
         return info
 
+    def prepare_data(self, idx: int) -> dict:
+        """Get data processed by ``self.pipeline``.
+
+        Args:
+            idx (int): The index of ``data_info``.
+
+        Returns:
+            dict: Results passed through ``self.pipeline``.
+        """
+        if not self.test_mode:
+            data_info = self.get_data_info(idx)
+            # Pass the dataset to the pipeline during training to support mixed
+            # data augmentation, such as polarmix and lasermix.
+            data_info['dataset'] = self
+            return self.pipeline(data_info)
+        else:
+            return super().prepare_data(idx)
+
     def get_scene_idxs(self, scene_idxs: Union[None, str,
                                                np.ndarray]) -> np.ndarray:
         """Compute scene_idxs for data sampling.
@@ -283,7 +319,8 @@ class Seg3DDataset(BaseDataset):
             scene_idxs = np.arange(len(self))
         if isinstance(scene_idxs, str):
             scene_idxs = osp.join(self.data_root, scene_idxs)
-            with self.file_client.get_local_path(scene_idxs) as local_path:
+            with get_local_path(
+                    scene_idxs, backend_args=self.backend_args) as local_path:
                 scene_idxs = np.load(local_path)
         else:
             scene_idxs = np.array(scene_idxs)

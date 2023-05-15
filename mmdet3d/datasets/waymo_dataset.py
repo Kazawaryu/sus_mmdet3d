@@ -27,10 +27,10 @@ class WaymoDataset(KittiDataset):
             camera data dict. Defaults to dict(
                                     pts='velodyne',
                                     CAM_FRONT='image_0',
-                                    CAM_FRONT_RIGHT='image_1',
-                                    CAM_FRONT_LEFT='image_2',
-                                    CAM_SIDE_RIGHT='image_3',
-                                    CAM_SIDE_LEFT='image_4')
+                                    CAM_FRONT_LEFT='image_1',
+                                    CAM_FRONT_RIGHT='image_2',
+                                    CAM_SIDE_LEFT='image_3',
+                                    CAM_SIDE_RIGHT='image_4')
         pipeline (List[dict]): Pipeline used for data processing.
             Defaults to [].
         modality (dict): Modality to specify the sensor data used
@@ -76,10 +76,10 @@ class WaymoDataset(KittiDataset):
                  data_prefix: dict = dict(
                      pts='velodyne',
                      CAM_FRONT='image_0',
-                     CAM_FRONT_RIGHT='image_1',
-                     CAM_FRONT_LEFT='image_2',
-                     CAM_SIDE_RIGHT='image_3',
-                     CAM_SIDE_LEFT='image_4'),
+                     CAM_FRONT_LEFT='image_1',
+                     CAM_FRONT_RIGHT='image_2',
+                     CAM_SIDE_LEFT='image_3',
+                     CAM_SIDE_RIGHT='image_4'),
                  pipeline: List[Union[dict, Callable]] = [],
                  modality: dict = dict(use_lidar=True),
                  default_cam_key: str = 'CAM_FRONT',
@@ -99,7 +99,7 @@ class WaymoDataset(KittiDataset):
         self.cat_ids = range(len(self.METAINFO['classes']))
         self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}
         self.max_sweeps = max_sweeps
-        # we do not provide file_client_args to custom_3d init
+        # we do not provide backend_args to custom_3d init
         # because we want disk loading for info
         # while ceph loading for Prediction2Waymo
         super().__init__(
