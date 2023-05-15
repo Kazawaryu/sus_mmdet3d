@@ -85,7 +85,7 @@ class TwoStage3DDetector(Base3DDetector):
 
         losses = dict()
 
-        print('before loss, memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
+        # print('before loss, memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
         # RPN forward and loss
         if self.with_rpn:
             proposal_cfg = self.train_cfg.get('rpn_proposal',
@@ -117,7 +117,7 @@ class TwoStage3DDetector(Base3DDetector):
                                         batch_data_samples, **kwargs)
         losses.update(roi_losses)
 
-        print('after loss, memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
+        #print('after loss, memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
         return losses
 
     def predict(self, batch_inputs_dict: dict, batch_data_samples: SampleList,
@@ -190,7 +190,7 @@ class TwoStage3DDetector(Base3DDetector):
             forward.
         """
         #print cuda memory usage info
-        print('memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
+        #print('memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
 
         feats_dict = self.extract_feat(batch_inputs_dict)
         rpn_outs = self.rpn_head.forward(feats_dict['neck_feats'])
