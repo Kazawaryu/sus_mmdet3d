@@ -237,6 +237,18 @@ def create_suscape_infos(root_path,
         info_val_path = osp.join(out_path, f'{val_info_name}.pkl')
         mmengine.dump(data, info_val_path)
 
+def _read_image_info(root_path, scene, frame, camera_type, camera):
+    with open(os.path.join(root_path, scene, 'calib', camera_type, camera+'.json')) as f:
+        calib = json.load(f)
+
+        return {
+            'lidar2cam': np.reshape(np.array(calib['extrinsic']),(4,4)),
+            'cam2img': np.reshape(np.array(calib['intrinsic']), (3,3)),     
+            'height': 1536,
+            'width': 2048,      
+        }
+
+
 def _read_scene(root_path, out_path, scene):
     lidar_folder = osp.join(root_path, scene, "lidar")
     lidars = os.listdir(lidar_folder)
@@ -259,11 +271,13 @@ def _read_scene(root_path, out_path, scene):
             bin_data = bin_data[(bin_data[:,0]!=0) & (bin_data[:,1]!=0) & (bin_data[:,2]!=0)]
             bin_data.tofile(bin_lidar_file)
 
+        
         info = {
             'lidar_points': {
                 'lidar_path': os.path.join("lidar.bin", scene, "lidar", frame+".bin"),
                 'num_pts_feats': 4,
                 },
+             'images': {},
             # 'sweeps': [],
             # 'cams': dict(),
             # 'lidar2ego_translation': cs_record['translation'],
@@ -272,6 +286,8 @@ def _read_scene(root_path, out_path, scene):
             # 'ego2global_rotation': pose_record['rotation'],
             # 'timestamp': sample['timestamp'],
         }
+
+        info['images']['camera/front'] = _read_image_info(root_path, scene, frame, 'camera', 'front')
 
         try:
             with open(osp.join(root_path, scene, 'label', frame+".json")) as fin:
@@ -289,7 +305,16 @@ def _read_scene(root_path, out_path, scene):
         info['instances'] = []
 
         for o in objs:
+            
+            
+            if not o['obj_type'] in METAINFO['classes']:
+                # inst['bbox_label'] = -1
+                # skip this obj
+                continue
+
             inst = dict()
+            inst['bbox_label'] = METAINFO['classes'].index(o['obj_type'])
+
             inst['bbox_3d'] = [o['psr']['position']['x'],
                                           o['psr']['position']['y'],
                                           o['psr']['position']['z'],
@@ -298,11 +323,12 @@ def _read_scene(root_path, out_path, scene):
                                           o['psr']['scale']['z'],
                                           o['psr']['rotation']['z'],
                                           ]
-            if o['obj_type'] in METAINFO['classes']:
-                inst['bbox_label'] = METAINFO['classes'].index(o['obj_type'])
-            else:
-                inst['bbox_label'] = -1
 
+            inst['truncated'] = 0
+            inst['alpha'] = 0
+            inst['occluded'] = 0
+            inst['bbox'] = [0,0,0,0]
+            inst['score'] = 0
             inst['bbox_label_3d'] = inst['bbox_label']
 
             info['instances'].append(inst)
