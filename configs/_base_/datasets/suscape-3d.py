@@ -1,7 +1,8 @@
 # dataset settings
 dataset_type = 'SuscapeDataset'
 data_root = 'data/suscape/'
-class_names = ['Car', 'Pedestrian', 'ScooterRider']
+class_names = ['Car', 'Pedestrian', 'ScooterRider', 'BicycleRider', 
+               'Scooter', 'Bicycle', 'Bus', 'Truck', 'Van']
 point_cloud_range = [-50, -50, -3, 50, 50, 1]
 input_modality = dict(use_lidar=True, use_camera=False)
 metainfo = dict(classes=class_names)
@@ -122,9 +123,9 @@ test_dataloader = dict(
         metainfo=metainfo,
         box_type_3d='LiDAR'))
 val_evaluator = dict(
-    type='KittiMetric',
-    ann_file=data_root + 'suscape_infos_val.pkl',
-    metric='bbox')
+    type='SuscapeMetric',
+    data_root='./',
+    ann_file=data_root + 'suscape_infos_val.pkl')
 test_evaluator = val_evaluator
 
 vis_backends = [dict(type='LocalVisBackend')]
