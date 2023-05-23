@@ -440,9 +440,19 @@ class PointRCNNBboxHead(BaseModule):
             # canonical transformation
             pos_gt_bboxes_ct[..., 0:3] -= roi_center
             pos_gt_bboxes_ct[..., 6] -= roi_ry
-            pos_gt_bboxes_ct[..., 0:3] = rotation_3d_in_axis(
+
+            #  "following code cause memory leak"
+            # pos_gt_bboxes_ct[..., 0:3] = rotation_3d_in_axis(
+            #     pos_gt_bboxes_ct[..., 0:3].unsqueeze(1), -(roi_ry),
+            #     axis=2).squeeze(1)
+            
+            rotated = rotation_3d_in_axis(
                 pos_gt_bboxes_ct[..., 0:3].unsqueeze(1), -(roi_ry),
                 axis=2).squeeze(1)
+            #pos_gt_bboxes_ct[..., 0:3] = rotated
+
+            pos_gt_bboxes_ct = torch.concat([rotated, pos_gt_bboxes_ct[..., 3:]], dim=-1)
+
 
             # flip orientation if gt have opposite orientation
             ry_label = pos_gt_bboxes_ct[..., 6] % (2 * np.pi)  # 0 ~ 2pi

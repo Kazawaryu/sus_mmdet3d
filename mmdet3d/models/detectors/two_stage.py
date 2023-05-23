@@ -104,6 +104,10 @@ class TwoStage3DDetector(Base3DDetector):
                     losses[f'rpn_{key}'] = rpn_losses[key]
                 else:
                     losses[key] = rpn_losses[key]
+            
+            if torch.isinf(losses['rpn_semantic_loss']):
+                print('rpn semantic loss inf')
+                raise RuntimeError(f"rpn semantic loss inf")
         else:
             # TODO: Not support currently, should have a check at Fast R-CNN
             assert batch_data_samples[0].get('proposals', None) is not None
@@ -117,6 +121,12 @@ class TwoStage3DDetector(Base3DDetector):
                                         batch_data_samples, **kwargs)
         losses.update(roi_losses)
 
+        for loss in losses:
+            if torch.isnan(losses[loss]).any():
+                raise ValueError(f'{loss} is nan')
+            if torch.isinf(losses[loss]).any():
+                raise ValueError(f'{loss} is inf')
+            
         #print('after loss, memory', torch.cuda.memory_allocated(), torch.cuda.memory_reserved())
         return losses
 

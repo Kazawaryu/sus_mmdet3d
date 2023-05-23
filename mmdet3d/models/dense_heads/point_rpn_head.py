@@ -176,7 +176,8 @@ class PointRPNHead(BaseModule):
         semantic_loss = self.cls_loss(semantic_points,
                                       semantic_points_label.reshape(-1),
                                       semantic_loss_weight.reshape(-1))
-        semantic_loss /= positive_mask.float().sum()
+        # lie, divide by zero protection
+        semantic_loss /= (positive_mask.float().sum() + 1)
         losses = dict(bbox_loss=bbox_loss, semantic_loss=semantic_loss)
 
         return losses

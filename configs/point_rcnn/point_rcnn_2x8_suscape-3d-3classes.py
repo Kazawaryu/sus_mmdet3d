@@ -8,7 +8,7 @@ dataset_type = 'SuscapeDataset'
 data_root = 'data/suscape/'
 class_names = ['Car', 'Pedestrian', 'ScooterRider']
 metainfo = dict(classes=class_names)
-point_cloud_range = [-50, -50, -3, 50, 50, 1]
+point_cloud_range = [-80, -80, -3, 80, 80, 2]
 input_modality = dict(use_lidar=True, use_camera=False)
 
 # db_sampler = dict(
@@ -66,8 +66,8 @@ test_pipeline = [
     dict(type='Pack3DDetInputs', keys=['points'])
 ]
 train_dataloader = dict(
-    batch_size=2,
-    num_workers=2,
+    batch_size=4,
+    num_workers=4,
     dataset=dict(
         type='RepeatDataset',
         times=2,
@@ -77,13 +77,13 @@ val_dataloader = dict(dataset=dict(pipeline=test_pipeline, metainfo=metainfo))
 
 lr = 0.0001  # max learning rate
 optim_wrapper = dict(optimizer=dict(lr=lr, betas=(0.95, 0.85)))
-train_cfg = dict(by_epoch=True, max_epochs=80, val_interval=2)
+train_cfg = dict(by_epoch=True, max_epochs=80, val_interval=80)
 
 # Default setting for scaling LR automatically
 #   - `enable` means enable scaling LR automatically
 #       or not by default.
 #   - `base_batch_size` = (8 GPUs) x (2 samples per GPU).
-auto_scale_lr = dict(enable=False, base_batch_size=16)
+auto_scale_lr = dict(enable=False, base_batch_size=32)
 param_scheduler = [
     # learning rate scheduler
     # During the first 35 epochs, learning rate increases from 0 to lr * 10

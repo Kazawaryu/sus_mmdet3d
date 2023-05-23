@@ -6,6 +6,22 @@ import torch
 from mmdet3d.registry import MODELS
 from .two_stage import TwoStage3DDetector
 
+# lie, detect nan tensors
+# def check_nan(d):
+#     if isinstance(d, dict):
+#         for k in d:
+#             check_nan(d[k])
+#     elif isinstance(d, list):
+#         for i, out in enumerate(d):
+#             check_nan(out)
+#     elif isinstance(d, torch.Tensor):
+#         nan_mask = torch.isnan(d)
+#         if nan_mask.any():
+#             raise RuntimeError(f"found nan")
+        
+# def nan_hook(self, input, output):
+#    check_nan(output)
+
 
 @MODELS.register_module()
 class PointRCNN(TwoStage3DDetector):
@@ -42,6 +58,14 @@ class PointRCNN(TwoStage3DDetector):
             test_cfg=test_cfg,
             init_cfg=init_cfg,
             data_preprocessor=data_preprocessor)
+        
+
+        # #lie, detect nan tensors
+        # for submodule in self.modules():
+        #     submodule.register_forward_hook(nan_hook)
+        #     #submodule.register_full_backward_hook(nan_hook)
+        
+
 
     def extract_feat(self, batch_inputs_dict: Dict) -> Dict:
         """Directly extract features from the backbone+neck.

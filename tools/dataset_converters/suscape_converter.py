@@ -304,6 +304,10 @@ def _read_scene(root_path, out_path, scene):
                 inst['bbox_label'] = -1
 
             inst['bbox_label_3d'] = inst['bbox_label']
+            inst['truncated'] = 0
+            inst['alpha'] = 0
+            inst['occluded'] = 0
+            inst['bbox'] = [0,0,0,0]
 
             info['instances'].append(inst)
 

@@ -363,16 +363,13 @@ if __name__ == '__main__':
             info_prefix=args.extra_tag,
             out_dir=args.out_dir,
             workers=args.workers)
-<<<<<<< HEAD
     elif args.dataset == 'suscape':
         suscape_data_prep(root_path=args.root_path,
             info_prefix=args.extra_tag,
             version=args.version,
             out_path=args.out_dir)
-=======
     elif args.dataset == 'semantickitti':
         semantickitti_data_prep(
             info_prefix=args.extra_tag, out_dir=args.out_dir)
->>>>>>> upstream/main
     else:
         raise NotImplementedError(f'Don\'t support {args.dataset} dataset.')

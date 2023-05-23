@@ -140,12 +140,15 @@ class BasePointSAModule(nn.Module):
         elif target_xyz is not None:
             new_xyz = target_xyz.contiguous()
         else:
-            if self.num_point is not None:
+            # lie, points_xyz may be empty.
+            if self.num_point is not None and points_xyz.shape[0] > 0:
                 indices = self.points_sampler(points_xyz, features)
                 new_xyz = gather_points(xyz_flipped,
                                         indices).transpose(1, 2).contiguous()
             else:
                 new_xyz = None
+                if points_xyz.shape[0] == 0:
+                    print('unexpected dimension')
 
         return new_xyz, indices
 
