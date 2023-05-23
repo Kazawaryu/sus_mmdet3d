@@ -273,6 +273,7 @@ def _read_scene(root_path, out_path, scene):
 
         
         info = {
+            'frame_path': scene+'/'+frame,
             'lidar_points': {
                 'lidar_path': os.path.join("lidar.bin", scene, "lidar", frame+".bin"),
                 'num_pts_feats': 4,

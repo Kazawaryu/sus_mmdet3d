@@ -71,24 +71,10 @@ def load_suscape_gts(lyft, data_root, eval_split, logger=None):
     return all_annotations
 
 
-def load_suscape_predictions(res_path):
-    """Load Lyft predictions from json file.
-
-    Args:
-        res_path (str): Path of result json file recording detections.
-
-    Returns:
-        list[dict]: List of prediction dictionaries.
-    """
-    predictions = mmengine.load(res_path)
-    predictions = predictions['results']
-    all_preds = []
-    for sample_token in predictions.keys():
-        all_preds.extend(predictions[sample_token])
-    return all_preds
 
 
-def suscape_eval(lyft, data_root, res_path, eval_set, output_dir, logger=None):
+
+def suscape_eval(gts, predictions, class_names, output_dir, logger=None):
     """Evaluation API for Lyft dataset.
 
     Args:
@@ -104,10 +90,10 @@ def suscape_eval(lyft, data_root, res_path, eval_set, output_dir, logger=None):
         dict[str, float]: The evaluation results.
     """
     # evaluate by lyft metrics
-    gts = load_lyft_gts(lyft, data_root, eval_set, logger)
-    predictions = load_lyft_predictions(res_path)
+    # gts = load_suscape_gts(lyft, data_root, eval_set, logger)
+    # predictions = load_suscape_predictions(res_path)
 
-    class_names = get_class_names(gts)
+    # class_names = get_class_names(gts)
     print('Calculating mAP@0.5:0.95...')
 
     iou_thresholds = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]

@@ -265,9 +265,9 @@ class SuscapeMetric(BaseMetric):
             annos = []
             boxes = output_to_lyft_box(det)
             sample_idx = sample_idx_list[i]
-            sample_token = self.data_infos[sample_idx]['token']
-            boxes = lidar_lyft_box_to_global(self.data_infos[sample_idx],
-                                             boxes)
+            sample_token = self.data_infos[sample_idx]['frame_path']
+            # boxes = lidar_lyft_box_to_global(self.data_infos[sample_idx],
+            #                                  boxes)
             for i, box in enumerate(boxes):
                 name = classes[box.label]
                 lyft_anno = dict(
@@ -313,6 +313,38 @@ class SuscapeMetric(BaseMetric):
             metric_dict.update(ret_dict)
         return metric_dict
 
+
+    def load_suscape_predictions(self, res_path):
+        """Load Lyft predictions from json file.
+
+        Args:
+            res_path (str): Path of result json file recording detections.
+
+        Returns:
+            list[dict]: List of prediction dictionaries.
+        """
+        predictions = mmengine.load(res_path)
+        predictions = predictions['results']
+        all_preds = []
+        for sample_token in predictions.keys():
+            all_preds.extend(predictions[sample_token])
+        return all_preds
+
+    def format_gts_lyft_format(self):
+        gts = []
+        for info in self.data_infos:
+            sample_token = info['frame_path']
+            for obj in info['instances']:
+                gts.append({
+                    'sample_token': sample_token,
+                    'translation': obj['bbox_3d'][0:3],
+                    'rotation': [np.cos(obj['bbox_3d'][6]/2), 0, 0, np.sin(obj['bbox_3d'][6]/2)], #quaternion, w,x,y,z (Hamilton format)
+                    'size': [obj['bbox_3d'][4], obj['bbox_3d'][3],obj['bbox_3d'][5]], #'wlh'
+                    'name': self.dataset_meta['classes'][obj['bbox_label_3d']],
+                })
+
+        return gts
+    
     def _evaluate_single(self,
                          result_path: str,
                          logger: MMLogger = None,
@@ -330,15 +362,20 @@ class SuscapeMetric(BaseMetric):
             Dict[str, float]: Dictionary of evaluation details.
         """
         output_dir = osp.join(*osp.split(result_path)[:-1])
-        lyft = Lyft(
-            data_path=osp.join(self.data_root, self.version),
-            json_path=osp.join(self.data_root, self.version, self.version),
-            verbose=True)
-        eval_set_map = {
-            'v1.01-train': 'val',
-        }
-        metrics = suscape_eval(lyft, self.data_root, result_path,
-                            eval_set_map[self.version], output_dir, logger)
+        # lyft = Lyft(
+        #     data_path=osp.join(self.data_root, self.version),
+        #     json_path=osp.join(self.data_root, self.version, self.version),
+        #     verbose=True)
+        # eval_set_map = {
+        #     'v1.01-train': 'val',
+        # }
+
+
+        # gts, predictions, class_names, 
+        gts = self.format_gts_lyft_format()
+        predictions = self.load_suscape_predictions(result_path)
+        metrics = suscape_eval(gts, predictions, self.dataset_meta['classes'], 
+                             output_dir, logger)
 
         # record metrics
         detail = dict()
@@ -385,28 +422,3 @@ def output_to_lyft_box(detection: dict) -> List[LyftBox]:
     return box_list
 
 
-def lidar_lyft_box_to_global(info: dict,
-                             boxes: List[LyftBox]) -> List[LyftBox]:
-    """Convert the box from ego to global coordinate.
-
-    Args:
-        info (dict): Info for a specific sample data, including the calibration
-            information.
-        boxes (List[:obj:`LyftBox`]): List of predicted LyftBoxes.
-
-    Returns:
-        List[:obj:`LyftBox`]: List of standard LyftBoxes in the global
-        coordinate.
-    """
-    box_list = []
-    for box in boxes:
-        # Move box to ego vehicle coord system
-        lidar2ego = np.array(info['lidar_points']['lidar2ego'])
-        box.rotate(Quaternion(matrix=lidar2ego, rtol=1e-05, atol=1e-07))
-        box.translate(lidar2ego[:3, 3])
-        # Move box to global coord system
-        ego2global = np.array(info['ego2global'])
-        box.rotate(Quaternion(matrix=ego2global, rtol=1e-05, atol=1e-07))
-        box.translate(ego2global[:3, 3])
-        box_list.append(box)
-    return box_list
