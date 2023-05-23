@@ -4,13 +4,6 @@ data_root = 'data/suscape/'
 class_names = ['Car', 'Pedestrian', 'ScooterRider', 'Truck', 'Scooter',
                 'Bicycle', 'Van', 'Bus', 'BicycleRider', #'BicycleGroup', 
                 'Trimotorcycle', #'RoadWorker', 
-                'LongVehicle', 'Cone', 
-                'TrafficBarrier', 'ConcreteTruck', 'Child', 'BabyCart', 
-                'RoadBarrel', #'FireHydrant', 
-                #'MotorcyleRider', 
-                'Crane', 
-                'ForkLift', 'Bulldozer', 'Excavator', 
-                #'Motorcycle'
                 ]
 
 point_cloud_range = [-80, -80, -3, 80, 80, 2]

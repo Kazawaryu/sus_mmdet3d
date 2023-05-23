@@ -169,18 +169,26 @@ METAINFO = {
     'classes': ['Car', 'Pedestrian', 'ScooterRider', 'Truck', 'Scooter',
                 'Bicycle', 'Van', 'Bus', 'BicycleRider', #'BicycleGroup', 
                 'Trimotorcycle', #'RoadWorker', 
-                'LongVehicle', 'Cone', 
-                'TrafficBarrier', 'ConcreteTruck', 'Child', 'BabyCart', 
-                'RoadBarrel', #'FireHydrant', 
-                #'MotorcyleRider', 
-                'Crane', 
-                'ForkLift', 'Bulldozer', 'Excavator', 
+                
+                # 'LongVehicle', 'Cone', 
+                # 'TrafficBarrier', 'ConcreteTruck', 'Child', 'BabyCart', 
+                # 'RoadBarrel', #'FireHydrant', 
+                # #'MotorcyleRider', 
+                # 'Crane', 
+                # 'ForkLift', 'Bulldozer', 'Excavator', 
                 #'Motorcycle'
                 ],     
     'classMap': {
         'Motorcycle': 'Scooter',
         'MotorcyleRider': 'ScooterRider',
-        'RoadWorker': 'Pedestrian'        
+        'RoadWorker': 'Pedestrian',
+        'LongVehicle': 'Truck',
+        'ConcreteTruck': 'Truck',
+        'Child': 'Pedestrian',
+        'Crane': 'Truck',
+        'ForkLift': 'Truck',
+        'Bulldozer': 'Truck', 
+        'Excavator': 'Truck',
     }
 }
 

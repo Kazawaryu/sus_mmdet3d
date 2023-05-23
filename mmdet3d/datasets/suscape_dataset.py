@@ -46,13 +46,6 @@ class SuscapeDataset(Det3DDataset):
             'Car', 'Pedestrian', 'ScooterRider', 'Truck', 'Scooter',
                 'Bicycle', 'Van', 'Bus', 'BicycleRider', #'BicycleGroup', 
                 'Trimotorcycle', #'RoadWorker', 
-                'LongVehicle', 'Cone', 
-                'TrafficBarrier', 'ConcreteTruck', 'Child', 'BabyCart', 
-                'RoadBarrel', #'FireHydrant', 
-                 #'MotorcyleRider', 
-                'Crane', 
-                'ForkLift', 'Bulldozer', 'Excavator', 
-                #'Motorcycle'
         ]
     }
     def __init__(self,
