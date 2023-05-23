@@ -1,9 +1,19 @@
 # dataset settings
 dataset_type = 'SuscapeDataset'
 data_root = 'data/suscape/'
-class_names = ['Car', 'Pedestrian', 'ScooterRider', 'BicycleRider', 
-               'Scooter', 'Bicycle', 'Bus', 'Truck', 'Van']
-point_cloud_range = [-50, -50, -3, 50, 50, 1]
+class_names = ['Car', 'Pedestrian', 'ScooterRider', 'Truck', 'Scooter',
+                'Bicycle', 'Van', 'Bus', 'BicycleRider', #'BicycleGroup', 
+                'Trimotorcycle', #'RoadWorker', 
+                'LongVehicle', 'Cone', 
+                'TrafficBarrier', 'ConcreteTruck', 'Child', 'BabyCart', 
+                'RoadBarrel', #'FireHydrant', 
+                #'MotorcyleRider', 
+                'Crane', 
+                'ForkLift', 'Bulldozer', 'Excavator', 
+                #'Motorcycle'
+                ]
+
+point_cloud_range = [-80, -80, -3, 80, 80, 2]
 input_modality = dict(use_lidar=True, use_camera=False)
 metainfo = dict(classes=class_names)
 
@@ -27,6 +37,8 @@ train_pipeline = [
         use_dim=4),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
     #dict(type='ObjectSample', db_sampler=db_sampler),
+    dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
+    dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),    
     dict(
         type='ObjectNoise',
         num_try=100,
@@ -34,12 +46,11 @@ train_pipeline = [
         global_rot_range=[0.0, 0.0],
         rot_range=[-0.78539816, 0.78539816]),
     dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.5),
+    dict(type='PointSample', num_points=16384, sample_range=60.0),
     dict(
         type='GlobalRotScaleTrans',
         rot_range=[-0.78539816, 0.78539816],
         scale_ratio_range=[0.95, 1.05]),
-    dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
-    dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
     dict(
         type='Pack3DDetInputs',
@@ -71,7 +82,7 @@ eval_pipeline = [
     dict(type='Pack3DDetInputs', keys=['points'])
 ]
 train_dataloader = dict(
-    batch_size=6,
+    batch_size=4,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),

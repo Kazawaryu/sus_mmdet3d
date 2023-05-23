@@ -51,7 +51,7 @@ model = dict(
             code_size=8,
             # code_size: (center residual (3), size regression (3),
             #             torch.cos(yaw) (1), torch.sin(yaw) (1)
-            use_mean_size=True,
+            use_mean_size=False,
             mean_size=[[3.9, 1.6, 1.56], [0.8, 0.6, 1.73], [1.76, 0.6,
                                                             1.73]])),
     roi_head=dict(

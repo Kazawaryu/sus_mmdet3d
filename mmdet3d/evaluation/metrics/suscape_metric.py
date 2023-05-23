@@ -64,7 +64,7 @@ class SuscapeMetric(BaseMetric):
                  csv_savepath: str = None,
                  collect_device: str = 'cpu',
                  backend_args: Optional[dict] = None) -> None:
-        self.default_prefix = 'Lyft metric'
+        self.default_prefix = 'Suscape metric'
         super(SuscapeMetric, self).__init__(
             collect_device=collect_device, prefix=prefix)
         self.ann_file = ann_file

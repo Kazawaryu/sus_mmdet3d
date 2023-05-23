@@ -164,8 +164,24 @@ def _read_list_from_file(path):
     return [line.strip() for line in lines]
 
 
+
 METAINFO = {
-    'classes': ['Car', 'Pedestrian', 'ScooterRider']# ('Car', 'Truck', 'Bus', 'Bicycle', 'Scooter', 'ScooterRider')
+    'classes': ['Car', 'Pedestrian', 'ScooterRider', 'Truck', 'Scooter',
+                'Bicycle', 'Van', 'Bus', 'BicycleRider', #'BicycleGroup', 
+                'Trimotorcycle', #'RoadWorker', 
+                'LongVehicle', 'Cone', 
+                'TrafficBarrier', 'ConcreteTruck', 'Child', 'BabyCart', 
+                'RoadBarrel', #'FireHydrant', 
+                #'MotorcyleRider', 
+                'Crane', 
+                'ForkLift', 'Bulldozer', 'Excavator', 
+                #'Motorcycle'
+                ],     
+    'classMap': {
+        'Motorcycle': 'Scooter',
+        'MotorcyleRider': 'ScooterRider',
+        'RoadWorker': 'Pedestrian'        
+    }
 }
 
 
@@ -218,6 +234,8 @@ def create_suscape_infos(root_path,
 
     metainfo = dict(version=version, dataset='suscape')
     metainfo['categories'] = {k: i for i, k in enumerate(METAINFO['classes'])}
+    metainfo['version'] = version
+    metainfo['info_version'] = '1.1'
 
     if test:
         print(f'test sample: {len(train_infos)}')
@@ -307,14 +325,14 @@ def _read_scene(root_path, out_path, scene):
 
         for o in objs:
             
-            
             if not o['obj_type'] in METAINFO['classes']:
                 # inst['bbox_label'] = -1
                 # skip this obj
                 continue
-
+            obj_type = METAINFO['classMap'][o['obj_type']] if o['obj_type'] in METAINFO['classMap'] else o['obj_type']
             inst = dict()
-            inst['bbox_label'] = METAINFO['classes'].index(o['obj_type'])
+            inst['class'] = obj_type
+            inst['bbox_label'] = METAINFO['classes'].index(obj_type)
 
             inst['bbox_3d'] = [o['psr']['position']['x'],
                                           o['psr']['position']['y'],

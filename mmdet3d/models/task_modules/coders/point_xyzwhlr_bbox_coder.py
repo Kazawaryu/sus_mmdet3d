@@ -49,7 +49,7 @@ class PointXYZWHLRBBoxCoder(BaseBBoxCoder):
 
         if self.use_mean_size:
             assert gt_labels_3d.max() <= self.mean_size.shape[0] - 1, \
-                f'the max gt label {gt_labels_3d.max()} is bigger than' \
+                f'the max gt label {gt_labels_3d.max()} is bigger than ' \
                 f'anchor types {self.mean_size.shape[0] - 1}.'
             self.mean_size = self.mean_size.to(gt_labels_3d.device)
             point_anchor_size = self.mean_size[gt_labels_3d]
