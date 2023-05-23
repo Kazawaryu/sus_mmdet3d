@@ -3,6 +3,14 @@ _base_ = [
     '../_base_/default_runtime.py', '../_base_/schedules/cyclic-40e.py'
 ]
 
+
+model = dict(
+    rpn_head = dict(
+        num_classes=len(_base_['class_names'])
+    )
+)
+
+
 lr = 0.0001  # max learning rate
 optim_wrapper = dict(optimizer=dict(lr=lr, betas=(0.95, 0.85)))
 
