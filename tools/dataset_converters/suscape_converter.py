@@ -275,10 +275,9 @@ def _read_image_info(root_path, scene, frame, camera_type, camera):
         }
 
 
-def _read_scene(root_path, out_path, scene):
+def _read_scene(root_path, out_path, scene, overwrite_lidar_file=False):
     lidar_folder = osp.join(root_path, scene, "lidar")
     lidars = os.listdir(lidar_folder)
-    frames = map(lambda x: os.path.splitext(x)[0], lidars)
     
     infos = []
     for l in lidars:
@@ -290,7 +289,7 @@ def _read_scene(root_path, out_path, scene):
 
         bin_lidar_file = osp.join(bin_lidar_path, frame+".bin")
 
-        if not os.path.exists(bin_lidar_file):
+        if not os.path.exists(bin_lidar_file) or overwrite_lidar_file :
             pcd_reader = BinPcdReader(osp.join(lidar_folder, l))
             
             bin_data = np.stack([pcd_reader.pc_data[x] for x in ['x', 'y', 'z', 'intensity']], axis=-1)
