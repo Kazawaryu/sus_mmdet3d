@@ -2666,3 +2666,34 @@ class LaserMix(BaseTransform):
         repr_str += f'pre_transform={self.pre_transform}, '
         repr_str += f'prob={self.prob})'
         return repr_str
+
+
+
+
+@TRANSFORMS.register_module()
+class PointsSave(BaseTransform):
+    """Save points to local storage for test purposes."""
+    def __init__(self, path: str) -> None:
+            self.path = path
+
+
+    def transform(self, input_dict: dict) -> dict:
+
+        import os
+
+        scene,frame = input_dict['frame_path'].split('/')
+        points_npy = input_dict['points'].tensor.numpy()
+
+        path = os.path.join(self.path, scene, 'lidar')
+        if os.path.exists(path) == False:
+            os.makedirs(path)
+        
+        file = os.path.join(path, frame+'.bin')
+        points_npy.astype(np.float32).tofile(file)
+        
+
+        return input_dict
+
+    def __repr__(self) -> str:
+        """str: Return a string that describes the module."""
+        return self.__class__.__name__
