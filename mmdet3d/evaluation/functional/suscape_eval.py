@@ -12,76 +12,16 @@ from mmengine.logging import print_log
 from terminaltables import AsciiTable
 
 
-def load_suscape_gts(lyft, data_root, eval_split, logger=None):
-    """Loads ground truth boxes from database.
-
-    Args:
-        lyft (:obj:`LyftDataset`): Lyft class in the sdk.
-        data_root (str): Root of data for reading splits.
-        eval_split (str): Name of the split for evaluation.
-        logger (logging.Logger | str, optional): Logger used for printing
-        related information during evaluation. Default: None.
-
-    Returns:
-        list[dict]: List of annotation dictionaries.
-    """
-    split_scenes = mmengine.list_from_file(
-        osp.join(data_root, f'{eval_split}.txt'))
-
-    # Read out all sample_tokens in DB.
-    sample_tokens_all = [s['token'] for s in lyft.sample]
-    assert len(sample_tokens_all) > 0, 'Error: Database has no samples!'
-
-    if eval_split == 'test':
-        # Check that you aren't trying to cheat :)
-        assert len(lyft.sample_annotation) > 0, \
-            'Error: You are trying to evaluate on the test set \
-             but you do not have the annotations!'
-
-    sample_tokens = []
-    for sample_token in sample_tokens_all:
-        scene_token = lyft.get('sample', sample_token)['scene_token']
-        scene_record = lyft.get('scene', scene_token)
-        if scene_record['name'] in split_scenes:
-            sample_tokens.append(sample_token)
-
-    all_annotations = []
-
-    print_log('Loading ground truth annotations...', logger=logger)
-    # Load annotations and filter predictions and annotations.
-    for sample_token in mmengine.track_iter_progress(sample_tokens):
-        sample = lyft.get('sample', sample_token)
-        sample_annotation_tokens = sample['anns']
-        for sample_annotation_token in sample_annotation_tokens:
-            # Get label name in detection task and filter unused labels.
-            sample_annotation = \
-                lyft.get('sample_annotation', sample_annotation_token)
-            detection_name = sample_annotation['category_name']
-            if detection_name is None:
-                continue
-            annotation = {
-                'sample_token': sample_token,
-                'translation': sample_annotation['translation'],
-                'size': sample_annotation['size'],
-                'rotation': sample_annotation['rotation'],
-                'name': detection_name,
-            }
-            all_annotations.append(annotation)
-
-    return all_annotations
-
-
 
 
 
 def suscape_eval(gts, predictions, class_names, output_dir, logger=None):
-    """Evaluation API for Lyft dataset.
+    """Evaluation API for Suscape dataset.
 
     Args:
-        lyft (:obj:`LyftDataset`): Lyft class in the sdk.
-        data_root (str): Root of data for reading splits.
-        res_path (str): Path of result json file recording detections.
-        eval_set (str): Name of the split for evaluation.
+        gts
+        predictions
+        class_names
         output_dir (str): Output directory for output json files.
         logger (logging.Logger | str, optional): Logger used for printing
                 related information during evaluation. Default: None.
@@ -89,11 +29,7 @@ def suscape_eval(gts, predictions, class_names, output_dir, logger=None):
     Returns:
         dict[str, float]: The evaluation results.
     """
-    # evaluate by lyft metrics
-    # gts = load_suscape_gts(lyft, data_root, eval_set, logger)
-    # predictions = load_suscape_predictions(res_path)
 
-    # class_names = get_class_names(gts)
     print('Calculating mAP@0.5:0.95...')
 
     iou_thresholds = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
