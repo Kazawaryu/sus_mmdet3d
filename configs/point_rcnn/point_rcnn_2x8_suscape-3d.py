@@ -46,21 +46,6 @@ _base_ = [
 #                 ]
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 model = dict(
     rpn_head = dict(
         num_classes=len(_base_['class_names']),        
