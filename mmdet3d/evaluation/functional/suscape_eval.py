@@ -50,7 +50,7 @@ def suscape_eval(gts, predictions, class_names, output_dir, logger=None):
 
     APs_data = [['class', 'mAP@0.5:0.95']]
     for i in range(len(class_names)):
-        row = [class_names[i], round(mAPs_cate[i], 3)]
+        row = [class_names[i], round(mAPs_cate[i], 3), np.round(average_precisions[i], 3)]
         APs_data.append(row)
     APs_data.append(['Overall', round(final_mAP, 3)])
     APs_table = AsciiTable(APs_data, title='mAPs@0.5:0.95')
