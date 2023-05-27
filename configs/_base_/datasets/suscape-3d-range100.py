@@ -7,7 +7,7 @@ class_names = ['Car', 'Pedestrian', 'ScooterRider'
                 'Trimotorcycle', #'RoadWorker', 
                 ]
 
-point_cloud_range = [-80, -80, -5, 80, 80, 3]
+point_cloud_range = [-100, -100, -5, 100, 100, 3]
 input_modality = dict(use_lidar=True, use_camera=False)
 metainfo = dict(classes=class_names)
 

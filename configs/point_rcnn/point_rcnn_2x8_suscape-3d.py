@@ -65,6 +65,11 @@ model = dict(
     )
 )
 
+train_dataloader = dict(
+    batch_size=4,
+    num_workers=4,
+)
+
 lr = 0.0005  # max learning rate
 optim_wrapper = dict(optimizer=dict(lr=lr, betas=(0.95, 0.85)))
 
