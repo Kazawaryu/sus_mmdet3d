@@ -23,6 +23,8 @@ test_dataloader = dict(
     num_workers=1,
 )
 
+train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=24, val_interval=2)
+
 # model settings
 model = dict(
     data_preprocessor=dict(
