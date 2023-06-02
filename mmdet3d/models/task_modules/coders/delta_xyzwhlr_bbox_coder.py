@@ -82,10 +82,20 @@ class DeltaXYZWLHRBBoxCoder(BaseBBoxCoder):
         yg = yt * diagonal + ya
         zg = zt * ha + za
 
+        lt = torch.clip(lt, -3, 5)
+        wt = torch.clip(wt, -3, 5)
+        ht = torch.clip(ht, -3, 5)
+
         lg = torch.exp(lt) * la
         wg = torch.exp(wt) * wa
         hg = torch.exp(ht) * ha
         rg = rt + ra
         zg = zg - hg / 2
         cgs = [t + a for t, a in zip(cts, cas)]
-        return torch.cat([xg, yg, zg, wg, lg, hg, rg, *cgs], dim=-1)
+        ret = torch.cat([xg, yg, zg, wg, lg, hg, rg, *cgs], dim=-1)
+
+        if torch.isnan(ret).any():
+            raise ValueError('Box decode has NaN values.')  
+        if torch.isinf(ret).any():
+            raise ValueError('Box decode has Inf values.')
+        return ret

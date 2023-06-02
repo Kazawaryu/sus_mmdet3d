@@ -65,6 +65,56 @@ model = dict(
     )
 )
 
+
+
+point_cloud_range = [-80, -80, -5, 80, 80, 3]
+
+train_pipeline = [
+    dict(
+        type='LoadPointsFromFile',
+        coord_type='LIDAR',
+        load_dim=4,  # x, y, z, intensity
+        use_dim=4),
+    dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
+    #dict(type='ObjectSample', db_sampler=db_sampler),
+    dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
+    dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),    
+    # dict(
+    #     type='ObjectNoise',
+    #     num_try=100,
+    #     translation_std=[1.0, 1.0, 0.5],
+    #     global_rot_range=[0.0, 0.0],
+    #     rot_range=[-0.78539816, 0.78539816]),
+    dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.5),
+    dict(type='PointSample', num_points=16384, sample_range=None),
+    dict(
+        type='GlobalRotScaleTrans',
+        rot_range=[-0.78539816, 0.78539816],
+        scale_ratio_range=[0.95, 1.05]),
+    dict(type='PointShuffle'),
+    # dict(
+    #     type='PointsSave',
+    #     path='./temp'
+    # ),
+    dict(
+        type='Pack3DDetInputs',
+        keys=['points', 'gt_bboxes_3d', 'gt_labels_3d']),
+]
+test_pipeline = [
+    dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=4, use_dim=4),    
+    dict(type='PointSample', num_points=16384, sample_range=None),
+    dict(type='Pack3DDetInputs', keys=['points'])
+]
+# construct a pipeline for data and gt loading in show function
+# please keep its loading function consistent with test_pipeline (e.g. client)
+eval_pipeline = [
+    dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=4, use_dim=4),
+    dict(type='PointSample', num_points=16384, sample_range=None),
+    dict(type='Pack3DDetInputs', keys=['points'])
+]
+
+
+
 train_dataloader = dict(
     batch_size=4,
     num_workers=4,

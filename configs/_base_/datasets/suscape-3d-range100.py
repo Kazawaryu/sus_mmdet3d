@@ -40,7 +40,7 @@ train_pipeline = [
     #     global_rot_range=[0.0, 0.0],
     #     rot_range=[-0.78539816, 0.78539816]),
     dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.5),
-    dict(type='PointSample', num_points=16384, sample_range=None),
+    #dict(type='PointSample', num_points=16384, sample_range=None),
     dict(
         type='GlobalRotScaleTrans',
         rot_range=[-0.78539816, 0.78539816],
@@ -56,14 +56,14 @@ train_pipeline = [
 ]
 test_pipeline = [
     dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=4, use_dim=4),    
-    dict(type='PointSample', num_points=16384, sample_range=None),
+    #dict(type='PointSample', num_points=16384, sample_range=None),
     dict(type='Pack3DDetInputs', keys=['points'])
 ]
 # construct a pipeline for data and gt loading in show function
 # please keep its loading function consistent with test_pipeline (e.g. client)
 eval_pipeline = [
     dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=4, use_dim=4),
-    dict(type='PointSample', num_points=16384, sample_range=None),
+    #dict(type='PointSample', num_points=16384, sample_range=None),
     dict(type='Pack3DDetInputs', keys=['points'])
 ]
 

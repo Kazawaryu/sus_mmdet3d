@@ -1,10 +1,7 @@
 # dataset settings
 dataset_type = 'SuscapeDataset'
 data_root = 'data/suscape/'
-class_names = ['Car', 'Pedestrian', 'ScooterRider'
-               , 'Truck', 'Scooter',
-                'Bicycle', 'Van', 'Bus', 'BicycleRider', #'BicycleGroup', 
-                'Trimotorcycle', #'RoadWorker', 
+class_names = ['Pedestrian', 'ScooterRider', 'Car'
                 ]
 
 point_cloud_range = [-80, -80, -5, 80, 80, 3]
