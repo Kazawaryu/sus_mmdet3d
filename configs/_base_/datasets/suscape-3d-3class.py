@@ -4,7 +4,7 @@ data_root = 'data/suscape/'
 class_names = ['Pedestrian', 'ScooterRider', 'Car'
                 ]
 
-point_cloud_range = [-80, -80, -5, 80, 80, 3]
+point_cloud_range = [0, -40, -3, 70.4, 40, 1]
 input_modality = dict(use_lidar=True, use_camera=False)
 metainfo = dict(classes=class_names)
 
