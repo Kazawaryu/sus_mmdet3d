@@ -13,7 +13,7 @@ model = dict(
             max_num_points=20,
             point_cloud_range=[-80, -80, -3, 80, 80, 2],
             voxel_size=voxel_size,
-            max_voxels=(80000, 90000))),
+            max_voxels=(200000, 300000))),
     pts_voxel_encoder=dict(type='HardSimpleVFE', num_features=5),
     pts_middle_encoder=dict(
         type='SparseEncoder',

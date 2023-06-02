@@ -1,17 +1,17 @@
 _base_ = [
-    '../_base_/models/second_hv_secfpn_kitti.py',
-    '../_base_/datasets/suscape-3d-3class.py',
+    '../_base_/models/second_hv_secfpn_suscape_fasterrcnn.py',
+    '../_base_/datasets/suscape-3d.py',
     '../_base_/schedules/cyclic-40e.py', '../_base_/default_runtime.py'
 ]
 
 train_dataloader = dict(
-    batch_size=2,
-    num_workers=2,
+    batch_size=4,
+    num_workers=4
 )
 
 val_dataloader = dict(
-    batch_size=2,
-    num_workers=2,
+    batch_size=4,
+    num_workers=4,
 )
 
 
