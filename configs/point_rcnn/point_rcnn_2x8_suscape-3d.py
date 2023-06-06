@@ -61,7 +61,6 @@ train_pipeline = [
 ]
 test_pipeline = [
     dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=4, use_dim=4),    
-    dict(type='PointSample', num_points=16384, sample_range=None),
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -77,13 +76,15 @@ test_pipeline = [
             dict(
                 type='PointsRangeFilter', point_cloud_range=point_cloud_range)
         ]),
+    dict(type='PointSample', num_points=16384, sample_range=None),
+    
     dict(type='Pack3DDetInputs', keys=['points'])
 ]
 # construct a pipeline for data and gt loading in show function
 # please keep its loading function consistent with test_pipeline (e.g. client)
 eval_pipeline = [
     dict(type='LoadPointsFromFile', coord_type='LIDAR', load_dim=4, use_dim=4),
-    dict(type='PointSample', num_points=16384, sample_range=None),
+    
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -99,6 +100,7 @@ eval_pipeline = [
             dict(
                 type='PointsRangeFilter', point_cloud_range=point_cloud_range)
         ]),
+    dict(type='PointSample', num_points=16384, sample_range=None),
     dict(type='Pack3DDetInputs', keys=['points'])
 ]
 
