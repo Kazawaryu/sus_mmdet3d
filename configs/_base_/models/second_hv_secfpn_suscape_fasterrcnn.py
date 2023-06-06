@@ -11,10 +11,10 @@ model = dict(
         voxel=True,
         voxel_layer=dict(
             max_num_points=20,
-            point_cloud_range=[-80, -80, -3, 80, 80, 2],
+            point_cloud_range=[-76.8, -51.2, -2, 76.8, 51.2, 4],
             voxel_size=voxel_size,
-            max_voxels=(200000, 300000))),
-    pts_voxel_encoder=dict(type='HardSimpleVFE', num_features=5),
+            max_voxels=(80000, 90000))),
+    pts_voxel_encoder=dict(type='HardSimpleVFE', num_features=4),
     pts_middle_encoder=dict(
         type='SparseEncoder',
         in_channels=4,
