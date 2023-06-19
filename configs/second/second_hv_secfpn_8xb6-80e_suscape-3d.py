@@ -20,7 +20,7 @@ test_dataloader = dict(
     num_workers=2,
 )
 
-
+train_cfg = dict(by_epoch=True, max_epochs=40, val_interval=40)
 
 lr = 0.0005
 # The optimizer follows the setting in SECOND.Pytorch, but here we use

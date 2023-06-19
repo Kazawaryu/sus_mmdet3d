@@ -11,9 +11,9 @@ model = dict(
         voxel=True,
         voxel_layer=dict(
             max_num_points=20,
-            point_cloud_range=[-76.8, -51.2, -2, 76.8, 51.2, 4],
+            point_cloud_range=[-76.8, -51.2, -3, 76.8, 51.2, 3],
             voxel_size=voxel_size,
-            max_voxels=(80000, 90000))),
+            max_voxels=(300000, 300000))),
     pts_voxel_encoder=dict(type='HardSimpleVFE', num_features=4),
     pts_middle_encoder=dict(
         type='SparseEncoder',
@@ -50,7 +50,7 @@ model = dict(
 
                     [-80, -80, -1.16544953, 80, 80, -1.16544953],
                     [-80, -80, -0.81176071, 80, 80, -0.81176071],
-                    [-80, -80, -0.2890795, 80, 80, -0.2890795],
+                    [-80, -80, -0.2890795,  80, 80, -0.2890795],
                     [-80, -80, -0.95039066, 80, 80, -0.95039066],
                     [-80, -80, -0.98711163, 80, 80, -0.98711163],
             ],
