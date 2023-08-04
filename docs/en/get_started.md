@@ -4,7 +4,7 @@
 
 In this section, we demonstrate how to prepare an environment with PyTorch.
 
-MMDetection3D works on Linux, Windows (experimental support) and macOS. It requires Python 3.7+, CUDA 9.2+, and PyTorch 1.6+.
+MMDetection3D works on Linux, Windows (experimental support) and macOS. It requires Python 3.7+, CUDA 10.0+, and PyTorch 1.8+.
 
 ```{note}
 If you are experienced with PyTorch and have already installed it, just skip this part and jump to the [next section](#installation). Otherwise, you can follow these steps for the preparation.
@@ -67,7 +67,7 @@ pip install -v -e .
 Case b: If you use mmdet3d as a dependency or third-party package, install it with MIM:
 
 ```shell
-mim install "mmdet3d>=1.1.0rc0"
+mim install "mmdet3d>=1.1.0"
 ```
 
 Note:
@@ -94,6 +94,8 @@ Note:
 
    ```shell
    conda install openblas-devel -c anaconda
+   export CPLUS_INCLUDE_PATH=CPLUS_INCLUDE_PATH:${YOUR_CONDA_ENVS_DIR}/include
+   # replace ${YOUR_CONDA_ENVS_DIR} to your anaconda environment path e.g. `/home/username/anaconda3/envs/openmmlab`.
    pip install -U git+https://github.com/NVIDIA/MinkowskiEngine -v --no-deps --install-option="--blas_include_dirs=/opt/conda/include" --install-option="--blas=openblas"
    ```
 
@@ -109,6 +111,7 @@ Note:
    ```shell
    conda install -c bioconda sparsehash
    export CPLUS_INCLUDE_PATH=CPLUS_INCLUDE_PATH:${YOUR_CONDA_ENVS_DIR}/include
+   # replace ${YOUR_CONDA_ENVS_DIR} to your anaconda environment path e.g. `/home/username/anaconda3/envs/openmmlab`.
    pip install --upgrade git+https://github.com/mit-han-lab/torchsparse.git@v1.4.0
    ```
 
@@ -256,7 +259,7 @@ pip install "mmcv>=2.0.0rc4" -f https://download.openmmlab.com/mmcv/dist/cu116/t
 ```python
 import mmdet3d
 print(mmdet3d.__version__)
-# Example output: 1.1.0rc0, or an another version.
+# Example output: 1.1.0, or an another version.
 ```
 
 ```{note}

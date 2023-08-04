@@ -38,7 +38,6 @@ class SECONDFPN(BaseModule):
         assert len(out_channels) == len(upsample_strides) == len(in_channels)
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.fp16_enabled = False
 
         deblocks = []
         for i, out_channel in enumerate(out_channels):
@@ -75,7 +74,8 @@ class SECONDFPN(BaseModule):
         """Forward function.
 
         Args:
-            x (torch.Tensor): 4D Tensor in (N, C, H, W) shape.
+            x (List[torch.Tensor]): Multi-level features with 4D Tensor in
+                (N, C, H, W) shape.
 
         Returns:
             list[torch.Tensor]: Multi-level feature maps.
