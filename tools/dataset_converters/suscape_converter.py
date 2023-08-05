@@ -5,7 +5,7 @@ from os import path as osp
 import mmengine
 import numpy as np
 import json
-
+from .suscape_dataset import SuscapeDataset
 
 
 ## pcd parser
@@ -222,8 +222,9 @@ def create_suscape_infos(root_path,
     else:
         raise ValueError('unknown')
 
+    suscape = SuscapeDataset(root_path)
     # filter existing scenes.
-    available_scenes = os.listdir(osp.join(root_path))
+    available_scenes = suscape.get_scene_names()
     
 
     available_scene_names = available_scenes
@@ -238,7 +239,7 @@ def create_suscape_infos(root_path,
                 val scene: {len(val_scenes)}')
         
     train_infos, val_infos = _fill_trainval_infos(
-        root_path, train_scenes, val_scenes, out_path, test, max_sweeps=max_sweeps)
+        suscape, train_scenes, val_scenes, out_path, test, max_sweeps=max_sweeps)
 
     metainfo = dict(version=version, dataset='suscape')
     metainfo['categories'] = {k: i for i, k in enumerate(METAINFO['classes'])}
@@ -247,7 +248,7 @@ def create_suscape_infos(root_path,
 
     if test:
         print(f'test sample: {len(train_infos)}')
-        data = dict(infos=train_infos, metainfo=metainfo)
+        data = dict(data_list=train_infos, metainfo=metainfo)
         info_name = f'{info_prefix}_infos_test'
         info_path = osp.join(out_path, f'{info_name}.pkl')
         mmengine.dump(data, info_path)
@@ -275,22 +276,22 @@ def _read_image_info(root_path, scene, frame, camera_type, camera):
         }
 
 
-def _read_scene(root_path, out_path, scene, overwrite_lidar_file=False):
-    lidar_folder = osp.join(root_path, scene, "lidar")
-    lidars = os.listdir(lidar_folder)
+def _read_scene(suscape, out_path, scene_name, overwrite_lidar_file=False):
     
+    scene = suscape.get_scene_info(scene_name)
+
     infos = []
-    for l in lidars:
-        frame = os.path.splitext(l)[0]
+    for frame in scene['frames']:
+        
         # write lidar bin files
-        bin_lidar_path = osp.join(out_path, "lidar.bin", scene, "lidar")
+        bin_lidar_path = osp.join(out_path, "lidar.bin", scene_name, "lidar")
         if os.path.exists(bin_lidar_path) == False:
             os.makedirs(bin_lidar_path)
 
         bin_lidar_file = osp.join(bin_lidar_path, frame+".bin")
 
         if not os.path.exists(bin_lidar_file) or overwrite_lidar_file :
-            pcd_reader = BinPcdReader(osp.join(lidar_folder, l))
+            pcd_reader = BinPcdReader(osp.join(suscape.cfg['lidar_dir'], scene_name, 'lidar', frame+scene['lidar_ext']))
             
             bin_data = np.stack([pcd_reader.pc_data[x] for x in ['x', 'y', 'z', 'intensity']], axis=-1)
             bin_data = bin_data[(bin_data[:,0]!=0) & (bin_data[:,1]!=0) & (bin_data[:,2]!=0)]
@@ -298,13 +299,15 @@ def _read_scene(root_path, out_path, scene, overwrite_lidar_file=False):
 
         
         info = {
-            'frame_path': scene+'/'+frame,
+            'frame_path': scene_name+'/'+frame,
             'lidar_points': {
-                'lidar_path': os.path.join("lidar.bin", scene, "lidar", frame+".bin"),
+                'lidar_path': os.path.join("lidar.bin", scene_name, "lidar", frame+".bin"),
                 'num_pts_feats': 4,
+                'lidar2ego': np.eye(4),
                 },
              'images': {},
-            # 'sweeps': [],
+             'ego2global': scene['lidar_pose'][frame]['lidarPose'],
+             'sweeps': [],
             # 'cams': dict(),
             # 'lidar2ego_translation': cs_record['translation'],
             # 'lidar2ego_rotation': cs_record['rotation'],
@@ -313,23 +316,25 @@ def _read_scene(root_path, out_path, scene, overwrite_lidar_file=False):
             # 'timestamp': sample['timestamp'],
         }
 
-        info['images']['camera/front'] = _read_image_info(root_path, scene, frame, 'camera', 'front')
+        # info['images']['camera/front'] = _read_image_info(root_path, scene, frame, 'camera', 'front')
 
-        try:
-            with open(osp.join(root_path, scene, 'label', frame+".json")) as fin:
-                label = json.load(fin)
-        except:
-            print("no label file: ", osp.join(root_path, scene, 'label', frame+".json"))
-            label = []
-        
-        objs = label['objs'] if 'objs' in label else label
+       
+        for cam in scene['camera']:
+            lidar2cam = suscape.get_calib_lidar2cam(scene, frame, 'camera', cam)
+            info['images'][cam] = {
+                'img_path': os.path.join(suscape.camera_dir, scene_name, 'camera', cam, frame+scene['camera_ext']),
+                'cam2img': scene['calib']['camera'][cam]['intrinsic'],
+                'cam2ego': np.linalg.inv(lidar2cam).tolist(),
+                'lidar2cam': lidar2cam.tolist()
+            }
 
+
+        objs = suscape.read_label(scene_name, frame)['objs']
         if len(objs) == 0:
-            print("no label: ", osp.join(root_path, scene, 'label', frame+".json"))
+            print("no objs: ", osp.join(scene_name, 'label', frame+".json"))
             continue
 
         info['instances'] = []
-
         for o in objs:
             
             if not o['obj_type'] in METAINFO['classes']:
@@ -366,7 +371,7 @@ def _read_scene(root_path, out_path, scene, overwrite_lidar_file=False):
         infos.append(info)
     return infos
 
-def _fill_trainval_infos(root_path,
+def _fill_trainval_infos(suscape,
                          train_scenes,
                          val_scenes,
                          out_path,
@@ -390,10 +395,12 @@ def _fill_trainval_infos(root_path,
     val_infos = []
 
     for scene in train_scenes:
-        infos = _read_scene(root_path, out_path, scene)
+        print(scene)
+        infos = _read_scene(suscape, out_path, scene)
         train_infos.extend(infos)
     for scene in val_scenes:
-        infos = _read_scene(root_path, out_path, scene)
+        print(scene)
+        infos = _read_scene(suscape, out_path, scene)
         val_infos.extend(infos)
     return train_infos, val_infos
 
