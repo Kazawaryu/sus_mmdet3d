@@ -196,7 +196,7 @@ METAINFO = {
 def create_suscape_infos(root_path,
                       info_prefix,
                       out_path,
-                      version='v1.0-train',
+                      version='v1.0-trainval',
                       max_sweeps=1):
     """Create info file of suscape dataset.
 
@@ -210,10 +210,10 @@ def create_suscape_infos(root_path,
         max_sweeps (int, optional): Max number of sweeps.
             Default: 1.
     """
-
-    available_vers = ['v1.0-train', 'v1.0-test']
+    print("create suscape info, saving to %s" % out_path)
+    available_vers = ['v1.0-trainval', 'v1.0-test']
     assert version in available_vers
-    if version == 'v1.0-train':
+    if version == 'v1.0-trainval':
         train_scenes = _read_list_from_file('data/suscape/train.txt')
         val_scenes = _read_list_from_file('data/suscape/val.txt')
     elif version == 'v1.0-test':
@@ -291,7 +291,7 @@ def _read_scene(suscape, out_path, scene_name, overwrite_lidar_file=False):
         bin_lidar_file = osp.join(bin_lidar_path, frame+".bin")
 
         if not os.path.exists(bin_lidar_file) or overwrite_lidar_file :
-            pcd_reader = BinPcdReader(osp.join(suscape.cfg['lidar_dir'], scene_name, 'lidar', frame+scene['lidar_ext']))
+            pcd_reader = BinPcdReader(osp.join(suscape.lidar_dir, scene_name, 'lidar', frame+scene['lidar_ext']))
             
             bin_data = np.stack([pcd_reader.pc_data[x] for x in ['x', 'y', 'z', 'intensity']], axis=-1)
             bin_data = bin_data[(bin_data[:,0]!=0) & (bin_data[:,1]!=0) & (bin_data[:,2]!=0)]
@@ -314,6 +314,8 @@ def _read_scene(suscape, out_path, scene_name, overwrite_lidar_file=False):
             # 'ego2global_translation': pose_record['translation'],
             # 'ego2global_rotation': pose_record['rotation'],
             # 'timestamp': sample['timestamp'],
+            'scene_token': scene_name,
+            'frame_token': frame,
         }
 
         # info['images']['camera/front'] = _read_image_info(root_path, scene, frame, 'camera', 'front')

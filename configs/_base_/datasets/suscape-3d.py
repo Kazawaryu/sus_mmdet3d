@@ -153,7 +153,9 @@ test_dataloader = dict(
 val_evaluator = dict(
     type='SuscapeMetric',
     data_root='./',
-    ann_file=data_root + 'suscape_infos_val.pkl')
+    ann_file=data_root + 'suscape_infos_val.pkl',
+    jsonfile_prefix='results/suscape-3d/suscape-3d_results'
+    )
 test_evaluator = val_evaluator
 
 vis_backends = [dict(type='LocalVisBackend')]

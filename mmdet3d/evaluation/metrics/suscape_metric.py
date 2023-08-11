@@ -105,6 +105,142 @@ class SuscapeMetric(BaseMetric):
             result['sample_idx'] = sample_idx
             self.results.append(result)
 
+    def format_results_suscape(self,
+                       outputs,
+                       score_threshold=0.0,
+                       submission_prefix=None):
+        assert isinstance(outputs, list), 'results must be a list'
+        
+
+        if not isinstance(outputs[0], dict):
+            result_files = self.bbox2result_suscape(outputs, self.dataset_meta['classes'],score_threshold,
+                                                    submission_prefix)
+        elif 'pred_instances_3d' in outputs[0]:
+            results_ = [out["pred_instances_3d"] for out in outputs]
+            result_files = self.bbox2result_suscape(
+                        results_, self.dataset_meta['classes'], score_threshold,
+                        submission_prefix)          
+        else:
+            result_files = self.bbox2result_suscape(outputs, self.dataset_meta['classes'],score_threshold,
+                                                  submission_prefix)
+        return result_files
+
+    def bbox2result_suscape(self,
+                          net_outputs,
+                          class_names,
+                          score_threshold=0,
+                          submission_prefix=None):
+        assert len(net_outputs) == len(self.data_infos['data_list']), \
+            'invalid list length of network outputs'
+
+        det_annos = []
+        print('\nConverting prediction to suscape format')
+        for idx, pred_dicts in enumerate(net_outputs):
+
+            info = self.data_infos['data_list'][idx]
+            annos = {
+                'scene': info['scene_token'],
+                'frame': info['frame_token'],
+                'objs': []
+                }
+            
+            #sample_idx = info['image']['image_idx']
+            #image_shape = info['image']['image_shape'][:2]
+
+            # box_dict = self.convert_valid_bboxes(pred_dicts["boxes_3d"],pred_dicts["scores_3d"], pred_dicts["labels_3d"])
+            if len(pred_dicts['scores_3d']) != 0:
+                for tensor, score, label in zip(pred_dicts['bboxes_3d'].tensor.numpy(), pred_dicts['scores_3d'].numpy(), pred_dicts['labels_3d'].numpy()):
+                    
+                    if score < score_threshold:
+                        continue
+                    
+                    obj = {
+                        'psr':{
+                            'position': {
+                                'x': tensor[0],
+                                'y': tensor[1],
+                                'z': tensor[2] + tensor[5]/2
+                            },
+                            'scale': {
+                                'x': tensor[3],
+                                'y': tensor[4],
+                                'z': tensor[5]
+                            },
+                            'rotation': {
+                                'x': 0,
+                                'y': 0,
+                                'z': tensor[6]
+                            }
+                        },
+                        'score': score,
+                        'obj_type': class_names[label],
+                        'obj_id': '',
+                        'obj_attr': str(score)
+                    }
+
+                    annos['objs'].append(obj)
+
+            det_annos.append(annos)
+
+        
+        if submission_prefix is not None:
+            # submission_file = submission_prefix + '.json'
+            # print(f'\nConverting prediction to {submission_file}')
+            # mmcv.dump(det_annos, submission_file)
+            # print(f'Result is saved to {submission_file}.')
+
+            # mmengine.mkdir_or_exist(submission_prefix)
+            print(f'save prediction to {submission_prefix}')
+            for d in det_annos:
+                os.makedirs(submission_prefix + '/' + d['scene'], exist_ok=True)
+                path = submission_prefix + '/' + d['scene'] + '/label/' + d['frame'] + '.json'
+
+                mmengine.dump(d, path)
+        
+        return det_annos
+
+    def format_gt_to_suscape(self, gt):
+        """Format suscape gt to suscape format.      
+        """
+        print('\nConverting ground truth to suscape format')
+
+      
+        gt_annos = []
+        
+        
+        for  frame in gt:
+            ann = {
+                'objs':  [],
+                'scene': frame['scene_token'],
+                'frame': frame['frame_token'],
+            }
+            for inst in frame['instances']:
+                obj = {
+                    'psr':{
+                        'position':{
+                            'x': inst['bbox_3d'][0],
+                            'y': inst['bbox_3d'][1],
+                            'z': inst['bbox_3d'][2],
+                        },
+                        'scale':{
+                            'x': inst['bbox_3d'][3],
+                            'y': inst['bbox_3d'][4],
+                            'z': inst['bbox_3d'][5],
+                        },
+                        'rotation':{
+                            'x': 0,
+                            'y': 0,
+                            'z': inst['bbox_3d'][6],
+                        },
+                    },
+                    'obj_type': inst['class'],
+                    
+                }
+
+                ann['objs'].append(obj)
+            gt_annos.append(ann)
+
+        return gt_annos
     def compute_metrics(self, results: List[dict]) -> Dict[str, float]:
         """Compute the metrics from processed results.
 
@@ -123,7 +259,26 @@ class SuscapeMetric(BaseMetric):
         # load annotations
         self.data_infos = load(
             osp.join(self.data_root, self.ann_file),
-            backend_args=self.backend_args)['data_list']
+            backend_args=self.backend_args)
+        
+
+        # suscape metrics
+        print(' compute suscape metrics')
+        result_files = self.format_results_suscape(results, 
+                                                   score_threshold=0.0, 
+                                                   submission_prefix=self.jsonfile_prefix)
+        from suscape.eval.detection_3d import evaluate as suscape_evaluate
+        import json
+        
+        gt_annos = self.format_gt_to_suscape(self.data_infos['data_list'])
+    
+        dt_res = result_files
+
+        metrics, metrics_string = suscape_evaluate(dt_res, gt_annos, self.dataset_meta['classes'])
+        print(metrics_string)
+
+
+        # lyft metrics
         result_dict, tmp_dir = self.format_results(results, classes,
                                                    self.jsonfile_prefix,
                                                    self.csv_savepath)
@@ -265,7 +420,7 @@ class SuscapeMetric(BaseMetric):
             annos = []
             boxes = output_to_lyft_box(det)
             sample_idx = sample_idx_list[i]
-            sample_token = self.data_infos[sample_idx]['frame_path']
+            sample_token = self.data_infos['data_list'][sample_idx]['frame_path']
             # boxes = lidar_lyft_box_to_global(self.data_infos[sample_idx],
             #                                  boxes)
             for i, box in enumerate(boxes):
@@ -332,7 +487,7 @@ class SuscapeMetric(BaseMetric):
 
     def format_gts_lyft_format(self):
         gts = []
-        for info in self.data_infos:
+        for info in self.data_infos['data_list']:
             sample_token = info['frame_path']
             for obj in info['instances']:
                 gts.append({
