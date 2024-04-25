@@ -142,6 +142,8 @@ class SparseEncoder(nn.Module):
         coors = coors.int()
         input_sp_tensor = SparseConvTensor(voxel_features, coors,
                                            self.sparse_shape, batch_size)
+        # print('#'*60)
+        # print(input_sp_tensor.dense().shape)
         x = self.conv_input(input_sp_tensor)
 
         encode_features = []

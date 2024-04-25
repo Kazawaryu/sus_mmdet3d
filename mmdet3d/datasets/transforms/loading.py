@@ -410,7 +410,12 @@ class LoadPointsFromMultiSweeps(BaseTransform):
                   cloud arrays.
         """
         points = results['points']
-        points.tensor[:, 4] = 0
+        # if points is not BasePoints, we need to convert it to BasePoints
+        if points.tensor.shape[1] == 4:
+            points.tensor = np.concatenate(
+                [points.tensor, np.zeros((points.tensor.shape[0], 1))], axis=1)
+        else:
+            points.tensor[:, 4] = 0
         sweep_points_list = [points]
         ts = results['timestamp']
         if 'lidar_sweeps' not in results:
