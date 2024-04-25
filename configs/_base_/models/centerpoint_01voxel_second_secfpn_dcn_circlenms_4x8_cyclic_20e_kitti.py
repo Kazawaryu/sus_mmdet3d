@@ -11,7 +11,8 @@ model = dict(
         sparse_shape=[41, 1600, 1408],
         output_channels=128,
         order=('conv', 'norm', 'act'),
-        encoder_channels=((16, 16, 32), (32, 32, 64), (64, 64, 128), (128, 128)),
+        encoder_channels=((16, 16, 32), (32, 32, 64), (64, 64, 128), (128, 
+                                                                      128)),
         encoder_paddings=((0, 0, 1), (0, 0, 1), (0, 0, [0, 1, 1]), (0, 0)),
         block_type='basicblock'), ### return [N, C * D, H, W]
     pts_backbone=dict(
