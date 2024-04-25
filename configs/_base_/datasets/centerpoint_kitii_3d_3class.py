@@ -1,4 +1,3 @@
-#########"""configs/_base_/datasets/centerpoint_kitii_3d_3class.py"""
 # dataset settings
 dataset_type = 'KittiDataset'
 data_root = 'data/kitti/'
