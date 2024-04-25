@@ -473,6 +473,8 @@ class CenterHead(BaseModule):
         grid_size = torch.tensor(self.train_cfg['grid_size']).to(device)
         pc_range = torch.tensor(self.train_cfg['point_cloud_range'])
         voxel_size = torch.tensor(self.train_cfg['voxel_size'])
+        # [{C}]: change here for kitti-centerpoint
+        gt_annotation_num = len(self.train_cfg['code_weights'])
 
         feature_map_size = grid_size[:2] // self.train_cfg['out_size_factor']
 
@@ -507,8 +509,9 @@ class CenterHead(BaseModule):
                 (len(self.class_names[idx]), feature_map_size[1],
                  feature_map_size[0]))
 
-            anno_box = gt_bboxes_3d.new_zeros((max_objs, 10),
-                                              dtype=torch.float32)
+            # anno_box = gt_bboxes_3d.new_zeros((max_objs, 10),
+            #                                   dtype=torch.float32)
+            anno_box = gt_bboxes_3d.new_zeros((max_objs, gt_annotation_num), dtype=torch.float32)
 
             ind = gt_labels_3d.new_zeros((max_objs), dtype=torch.int64)
             mask = gt_bboxes_3d.new_zeros((max_objs), dtype=torch.uint8)
@@ -567,19 +570,31 @@ class CenterHead(BaseModule):
                     # TODO: support other outdoor dataset
                     # print('#'*100)
                     # print(task_box[idx])
-                    vx, vy = task_boxes[idx][k][7:]
+
+                    # [{C}]: change here for kitti-centerpoint
+                    #####################################################
+                    # vx, vy = task_boxes[idx][k][7:]
                     rot = task_boxes[idx][k][6]
                     box_dim = task_boxes[idx][k][3:6]
                     if self.norm_bbox:
                         box_dim = box_dim.log()
-                    anno_box[new_idx] = torch.cat([
+                    # anno_box[new_idx] = torch.cat([
+                    #     center - torch.tensor([x, y], device=device),
+                    #     z.unsqueeze(0), box_dim,
+                    #     torch.sin(rot).unsqueeze(0),
+                    #     torch.cos(rot).unsqueeze(0),
+                    #     # vx.unsqueeze(0),
+                    #     # vy.unsqueeze(0)
+                    # ])
+                    anno_elems = [
                         center - torch.tensor([x, y], device=device),
                         z.unsqueeze(0), box_dim,
                         torch.sin(rot).unsqueeze(0),
-                        torch.cos(rot).unsqueeze(0),
-                        vx.unsqueeze(0),
-                        vy.unsqueeze(0)
-                    ])
+                        torch.cos(rot).unsqueeze(0)
+                    ]
+                    anno_box[new_idx] = torch.cat(anno_elems)
+
+                    #####################################################
 
             heatmaps.append(heatmap)
             anno_boxes.append(anno_box)
@@ -639,11 +654,20 @@ class CenterHead(BaseModule):
                 avg_factor=max(num_pos, 1))
             target_box = anno_boxes[task_id]
             # reconstruct the anno_box from multiple reg heads
-            preds_dict[0]['anno_box'] = torch.cat(
-                (preds_dict[0]['reg'], preds_dict[0]['height'],
-                 preds_dict[0]['dim'], preds_dict[0]['rot'],
-                 preds_dict[0]['vel']),
-                dim=1)
+            # preds_dict[0]['anno_box'] = torch.cat(
+            #     (preds_dict[0]['reg'], preds_dict[0]['height'],
+            #      preds_dict[0]['dim'], preds_dict[0]['rot'],
+            #      preds_dict[0]['vel']),
+            #     dim=1)
+            anno_box = [
+                preds_dict[0]['reg'], preds_dict[0]['height'],
+                preds_dict[0]['dim'], preds_dict[0]['rot']
+            ]
+            # Key assumed to exist for bbox annotations with 9 values
+            if 'vel' in preds_dict[0]:
+                anno_box.append(preds_dict[0]['vel'])
+            preds_dict[0]['anno_box'] = torch.cat(anno_box, dim=1)
+
 
             # Regression loss for dimension, offset, height, rotation
             ind = inds[task_id]
