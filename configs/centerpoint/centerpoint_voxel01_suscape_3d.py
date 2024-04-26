@@ -1,8 +1,9 @@
-# """configs/centerpoint/centerpoint_pillar02_kitti_3d.py"""
+# """configs/centerpoint/centerpoint_pillar03_kitti_3d.py"""
 _base_ = [
-    '../_base_/datasets/suscape-3d.py',
-    '../_base_/models/centerpoint_voxel01_second_secfpn_kitti.py',
-    '../_base_/schedules/cyclic-20e.py', '../_base_/default_runtime.py'
+    "../_base_/datasets/suscape-3d.py",
+    "../_base_/models/centerpoint_voxel01_second_secfpn_kitti.py",
+    "../_base_/schedules/cyclic-20e.py",
+    "../_base_/default_runtime.py",
 ]
 
 # If point cloud range is changed, the models should also change their point
@@ -21,25 +22,32 @@ point_cloud_range = [-80, -80, -5, 80, 80, 3]
 #     'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
 #     'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
 # ]
-class_names = ['Car', 'Pedestrian', 'ScooterRider'
-               , 'Truck', 'Scooter',
-                'Bicycle', 'Van', 'Bus', 'BicycleRider', #'BicycleGroup', 
-                'Trimotorcycle', #'RoadWorker', 
-                ]
+class_names = [
+    "Car",
+    "Pedestrian",
+    "ScooterRider",
+    "Truck",
+    "Scooter",
+    "Bicycle",
+    "Van",
+    "Bus",
+    "BicycleRider",  #'BicycleGroup',
+    "Trimotorcycle",  #'RoadWorker',
+]
 # data_prefix = dict(pts='samples/LIDAR_TOP', img='', sweeps='sweeps/LIDAR_TOP')
 model = dict(
-    data_preprocessor=dict(
-        voxel_layer=dict(point_cloud_range=point_cloud_range)),
-    #pts_voxel_encoder=dict(point_cloud_range=point_cloud_range),
+    data_preprocessor=dict(voxel_layer=dict(point_cloud_range=point_cloud_range)),
+    # pts_voxel_encoder=dict(point_cloud_range=point_cloud_range),
     pts_bbox_head=dict(bbox_coder=dict(pc_range=point_cloud_range[:2])),
     # model training and testing settings
     train_cfg=dict(pts=dict(point_cloud_range=point_cloud_range)),
-    test_cfg=dict(pts=dict(pc_range=point_cloud_range[:2])))
+    test_cfg=dict(pts=dict(pc_range=point_cloud_range[:2])),
+)
 
 # dataset_type = 'NuScenesDataset'
 # data_root = 'data/nuscenes/'
-dataset_type = 'SuscapeDataset'
-data_root = 'data/suscape/'
+dataset_type = "SuscapeDataset"
+data_root = "data/suscape/"
 backend_args = None
 
 # db_sampler = dict(
@@ -82,13 +90,14 @@ backend_args = None
 
 train_pipeline = [
     dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
+        type="LoadPointsFromFile",
+        coord_type="LIDAR",
         # load_dim=5,
         # use_dim=5,
         load_dim=4,
         use_dim=4,
-        backend_args=backend_args),
+        backend_args=backend_args,
+    ),
     # dict(
     #     type='LoadPointsFromMultiSweeps',
     #     sweeps_num=9,
@@ -96,7 +105,7 @@ train_pipeline = [
     #     pad_empty_sweeps=True,
     #     remove_close=True,
     #     backend_args=backend_args),
-    dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
+    dict(type="LoadAnnotations3D", with_bbox_3d=True, with_label_3d=True),
     # dict(type='ObjectSample', db_sampler=db_sampler),
     # dict(
     #     type='GlobalRotScaleTrans',
@@ -104,32 +113,32 @@ train_pipeline = [
     #     scale_ratio_range=[0.95, 1.05],
     #     translation_std=[0, 0, 0]),
     dict(
-        type='GlobalRotScaleTrans',
+        type="GlobalRotScaleTrans",
         rot_range=[-0.78539816, 0.78539816],
-        scale_ratio_range=[0.95, 1.05]),
+        scale_ratio_range=[0.95, 1.05],
+    ),
     dict(
-        type='RandomFlip3D',
+        type="RandomFlip3D",
         # sync_2d=False,
         flip_ratio_bev_horizontal=0.5,
         # flip_ratio_bev_vertical=0.5
-        ),
-    dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
-    dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
+    ),
+    dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
+    dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
     # dict(type='ObjectNameFilter', classes=class_names),
-    dict(type='PointShuffle'),
-    dict(
-        type='Pack3DDetInputs',
-        keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(type="PointShuffle"),
+    dict(type="Pack3DDetInputs", keys=["points", "gt_bboxes_3d", "gt_labels_3d"]),
 ]
 test_pipeline = [
     dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
+        type="LoadPointsFromFile",
+        coord_type="LIDAR",
         # load_dim=5,
         # use_dim=5,
         load_dim=4,
         use_dim=4,
-        backend_args=backend_args),
+        backend_args=backend_args,
+    ),
     # dict(
     #     type='LoadPointsFromMultiSweeps',
     #     sweeps_num=9,
@@ -138,20 +147,22 @@ test_pipeline = [
     #     remove_close=True,
     #     backend_args=backend_args),
     dict(
-        type='MultiScaleFlipAug3D',
+        type="MultiScaleFlipAug3D",
         img_scale=(1333, 800),
         pts_scale_ratio=1,
         flip=False,
         transforms=[
             dict(
-                type='GlobalRotScaleTrans',
+                type="GlobalRotScaleTrans",
                 rot_range=[0, 0],
-                scale_ratio_range=[1., 1.],
-                translation_std=[0, 0, 0]),
-            dict(type='RandomFlip3D'),
-            dict( type='PointsRangeFilter', point_cloud_range=point_cloud_range)
-        ]),
-    dict(type='Pack3DDetInputs', keys=['points'])
+                scale_ratio_range=[1.0, 1.0],
+                translation_std=[0, 0, 0],
+            ),
+            dict(type="RandomFlip3D"),
+            dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
+        ],
+    ),
+    dict(type="Pack3DDetInputs", keys=["points"]),
 ]
 
 # train_dataloader = dict(
@@ -179,54 +190,69 @@ test_pipeline = [
 
 
 train_dataloader = dict(
-    dataset=dict(dataset=dict(pipeline=train_pipeline, metainfo=dict(classes=class_names))))
+    batch_size=10,
+    num_workers=4,
+    dataset=dict(
+        dataset=dict(pipeline=train_pipeline, metainfo=dict(classes=class_names))
+    ),
+    # dataset=dict(pipeline=train_pipeline, metainfo=dict(classes=class_names)),
+)
 
 
 test_dataloader = dict(
-    dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)))
+    batch_size=10,
+    num_workers=4,
+    dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)),
+)
 val_dataloader = dict(
-    dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)))
+    batch_size=10,
+    num_workers=4,
+    dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)),
+)
 
 
-lr = 0.0005
-epoch_num = 20
+lr = 0.0001
+epoch_num = 40
 optim_wrapper = dict(optimizer=dict(lr=lr), clip_grad=dict(max_norm=35, norm_type=2))
 param_scheduler = [
     dict(
-        type='CosineAnnealingLR',
+        type="CosineAnnealingLR",
         T_max=epoch_num * 0.4,
         eta_min=lr * 10,
         begin=0,
         end=epoch_num * 0.4,
         by_epoch=True,
-        convert_to_iter_based=True),
+        convert_to_iter_based=True,
+    ),
     dict(
-        type='CosineAnnealingLR',
+        type="CosineAnnealingLR",
         T_max=epoch_num * 0.6,
         eta_min=lr * 1e-4,
         begin=epoch_num * 0.4,
         end=epoch_num * 1,
         by_epoch=True,
-        convert_to_iter_based=True),
+        convert_to_iter_based=True,
+    ),
     dict(
-        type='CosineAnnealingMomentum',
+        type="CosineAnnealingMomentum",
         T_max=epoch_num * 0.4,
         eta_min=0.85 / 0.95,
         begin=0,
         end=epoch_num * 0.4,
         by_epoch=True,
-        convert_to_iter_based=True),
+        convert_to_iter_based=True,
+    ),
     dict(
-        type='CosineAnnealingMomentum',
+        type="CosineAnnealingMomentum",
         T_max=epoch_num * 0.6,
         eta_min=1,
         begin=epoch_num * 0.4,
         end=epoch_num * 1,
-        convert_to_iter_based=True)
+        convert_to_iter_based=True,
+    ),
 ]
 
 train_cfg = dict(by_epoch=True, max_epochs=epoch_num, val_interval=20)
 val_cfg = dict()
 
 # train_cfg = dict(val_interval=20)
-
