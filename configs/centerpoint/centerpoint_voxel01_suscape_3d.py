@@ -1,13 +1,13 @@
 # """configs/centerpoint/centerpoint_pillar02_kitti_3d.py"""
 _base_ = [
-    '../_base_/datasets/centerpoint_kitii_3d_3class.py',
+    '../_base_/datasets/suscape-3d.py',
     '../_base_/models/centerpoint_voxel01_second_secfpn_kitti.py',
     '../_base_/schedules/cyclic-20e.py', '../_base_/default_runtime.py'
 ]
 
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
-point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
+point_cloud_range = [-80, -80, -5, 80, 80, 3]
 # Using calibration info convert the Lidar-coordinate point cloud range to the
 # ego-coordinate point cloud range could bring a little promotion in nuScenes.
 # point_cloud_range = [-51.2, -52, -5.0, 51.2, 50.4, 3.0]
@@ -21,7 +21,11 @@ point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
 #     'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
 #     'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
 # ]
-class_names = ['Pedestrian', 'Cyclist', 'Car']
+class_names = ['Car', 'Pedestrian', 'ScooterRider'
+               , 'Truck', 'Scooter',
+                'Bicycle', 'Van', 'Bus', 'BicycleRider', #'BicycleGroup', 
+                'Trimotorcycle', #'RoadWorker', 
+                ]
 # data_prefix = dict(pts='samples/LIDAR_TOP', img='', sweeps='sweeps/LIDAR_TOP')
 model = dict(
     data_preprocessor=dict(
@@ -34,47 +38,47 @@ model = dict(
 
 # dataset_type = 'NuScenesDataset'
 # data_root = 'data/nuscenes/'
-dataset_type = 'KittiDataset'
-data_root = 'data/kitti/'
+dataset_type = 'SuscapeDataset'
+data_root = 'data/suscape/'
 backend_args = None
 
-db_sampler = dict(
-    data_root=data_root,
-    # info_path=data_root + 'nuscenes_dbinfos_train.pkl',
-    info_path=data_root + 'kitti_dbinfos_train.pkl',
-    rate=1.0,
-    # prepare=dict(
-    #     filter_by_difficulty=[-1],
-    #     filter_by_min_points=dict(
-    #         car=5,
-    #         truck=5,
-    #         bus=5,
-    #         trailer=5,
-    #         construction_vehicle=5,
-    #         traffic_cone=5,
-    #         barrier=5,
-    #         motorcycle=5,
-    #         bicycle=5,
-    #         pedestrian=5)),
-    prepare=dict(
-        filter_by_difficulty=[-1],
-        filter_by_min_points=dict(
-            car=5,
-            Cyclist = 5,
-            pedestrian=5)),
-    classes=class_names,
-    sample_groups=dict(
-            car=2,
-            Cyclist = 4,
-            pedestrian=4),
-    points_loader=dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
-        # load_dim=5,
-        load_dim=4,
-        # use_dim=[0, 1, 2, 3, 4],
-        backend_args=backend_args),
-    backend_args=backend_args)
+# db_sampler = dict(
+#     data_root=data_root,
+#     # info_path=data_root + 'nuscenes_dbinfos_train.pkl',
+#     info_path=data_root + 'kitti_dbinfos_train.pkl',
+#     rate=1.0,
+#     # prepare=dict(
+#     #     filter_by_difficulty=[-1],
+#     #     filter_by_min_points=dict(
+#     #         car=5,
+#     #         truck=5,
+#     #         bus=5,
+#     #         trailer=5,
+#     #         construction_vehicle=5,
+#     #         traffic_cone=5,
+#     #         barrier=5,
+#     #         motorcycle=5,
+#     #         bicycle=5,
+#     #         pedestrian=5)),
+#     prepare=dict(
+#         filter_by_difficulty=[-1],
+#         filter_by_min_points=dict(
+#             car=5,
+#             Cyclist = 5,
+#             pedestrian=5)),
+#     classes=class_names,
+#     sample_groups=dict(
+#             car=2,
+#             Cyclist = 4,
+#             pedestrian=4),
+#     points_loader=dict(
+#         type='LoadPointsFromFile',
+#         coord_type='LIDAR',
+#         # load_dim=5,
+#         load_dim=4,
+#         # use_dim=[0, 1, 2, 3, 4],
+#         backend_args=backend_args),
+#     backend_args=backend_args)
 
 train_pipeline = [
     dict(
