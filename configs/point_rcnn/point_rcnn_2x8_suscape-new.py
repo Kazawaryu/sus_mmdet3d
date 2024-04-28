@@ -6,8 +6,6 @@ _base_ = [
 ]
 
 point_cloud_range = [-80, -80, -5, 80, 80, 3]
-input_modality = dict(use_lidar=True, use_camera=False)
-metainfo = dict(classes=class_names)
 
 class_names = [
     "Car",
@@ -21,6 +19,9 @@ class_names = [
     "BicycleRider",  #'BicycleGroup',
     "Trimotorcycle",  #'RoadWorker',
 ]
+
+input_modality = dict(use_lidar=True, use_camera=False)
+metainfo = dict(classes=class_names)
 
 model = dict(
     rpn_head=dict(
