@@ -6,6 +6,8 @@ _base_ = [
 ]
 
 point_cloud_range = [-80, -80, -5, 80, 80, 3]
+input_modality = dict(use_lidar=True, use_camera=False)
+metainfo = dict(classes=class_names)
 
 class_names = [
     "Car",
@@ -52,14 +54,15 @@ train_pipeline = [
         use_dim=4,
     ),
     dict(type="LoadAnnotations3D", with_bbox_3d=True, with_label_3d=True),
+    dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
+    dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
+    dict(type="RandomFlip3D", flip_ratio_bev_horizontal=0.5),
+    dict(type="PointSample", num_points=16384, sample_range=None),
     dict(
         type="GlobalRotScaleTrans",
         rot_range=[-0.78539816, 0.78539816],
         scale_ratio_range=[0.95, 1.05],
     ),
-    dict(type="RandomFlip3D", flip_ratio_bev_horizontal=0.5),
-    dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
-    dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
     dict(type="PointShuffle"),
     dict(type="Pack3DDetInputs", keys=["points", "gt_bboxes_3d", "gt_labels_3d"]),
 ]
@@ -69,32 +72,76 @@ test_pipeline = [
     dict(type="PointSample", num_points=16384, sample_range=None),
     dict(type="Pack3DDetInputs", keys=["points"]),
 ]
-
 train_dataloader = dict(
-    batch_size=10,
-    num_workers=4,
+    batch_size=2,
+    num_workers=2,
+    persistent_workers=True,
+    sampler=dict(type="DefaultSampler", shuffle=True),
     dataset=dict(
-        dataset=dict(pipeline=train_pipeline, metainfo=dict(classes=class_names))
+        type="RepeatDataset",
+        times=2,
+        dataset=dict(
+            type=dataset_type,
+            data_root=data_root,
+            ann_file="suscape_infos_train.pkl",
+            data_prefix=dict(pts=""),
+            pipeline=train_pipeline,
+            modality=input_modality,
+            test_mode=False,
+            metainfo=metainfo,
+            # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
+            # and box_type_3d='Depth' in sunrgbd and scannet dataset.
+            box_type_3d="LiDAR",
+        ),
     ),
-    # dataset=dict(pipeline=train_pipeline, metainfo=dict(classes=class_names)),
-)
-
-
-test_dataloader = dict(
-    batch_size=10,
-    num_workers=4,
-    dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)),
 )
 val_dataloader = dict(
-    batch_size=10,
-    num_workers=4,
-    dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)),
+    batch_size=2,
+    num_workers=2,
+    persistent_workers=True,
+    drop_last=False,
+    sampler=dict(type="DefaultSampler", shuffle=False),
+    dataset=dict(
+        type=dataset_type,
+        data_root=data_root,
+        data_prefix=dict(pts=""),
+        ann_file="suscape_infos_val.pkl",
+        pipeline=test_pipeline,
+        modality=input_modality,
+        test_mode=True,
+        metainfo=metainfo,
+        box_type_3d="LiDAR",
+    ),
 )
+test_dataloader = dict(
+    batch_size=2,
+    num_workers=2,
+    persistent_workers=True,
+    drop_last=False,
+    sampler=dict(type="DefaultSampler", shuffle=False),
+    dataset=dict(
+        type=dataset_type,
+        data_root=data_root,
+        data_prefix=dict(pts=""),
+        ann_file="suscape_infos_val.pkl",
+        pipeline=test_pipeline,
+        modality=input_modality,
+        test_mode=True,
+        metainfo=metainfo,
+        box_type_3d="LiDAR",
+    ),
+)
+
+val_evaluator = dict(
+    type="SuscapeMetric", data_root="./", ann_file=data_root + "suscape_infos_val.pkl"
+)
+test_evaluator = val_evaluator
+
 
 lr = 0.0001
 optim_wrapper = dict(optimizer=dict(lr=lr, betas=(0.95, 0.85)))
 num_epochs = 40
-train_cfg = dict(by_epoch=True, max_epochs=num_epochs, val_interval=1)
+train_cfg = dict(by_epoch=True, max_epochs=num_epochs, val_interval=20)
 
 auto_scale_lr = dict(enable=False, base_batch_size=32)
 param_scheduler = [
@@ -142,6 +189,3 @@ param_scheduler = [
         convert_to_iter_based=True,
     ),
 ]
-
-# train_cfg = dict(by_epoch=True, max_epochs=epoch_num, val_interval=20)
-# val_cfg = dict()
