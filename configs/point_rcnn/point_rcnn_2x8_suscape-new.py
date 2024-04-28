@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/models/point_rcnn_2x8.py',
+    '../_base_/models/point_rcnn.py',
     "../_base_/datasets/suscape-3d.py",
     "../_base_/default_runtime.py",
     "../_base_/schedules/cyclic-20e.py"
