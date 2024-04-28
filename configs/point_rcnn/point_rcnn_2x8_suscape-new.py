@@ -73,11 +73,10 @@ test_pipeline = [
     dict(type="PointSample", num_points=16384, sample_range=None),
     dict(type="Pack3DDetInputs", keys=["points"]),
 ]
+
 train_dataloader = dict(
     batch_size=2,
     num_workers=2,
-    persistent_workers=True,
-    sampler=dict(type="DefaultSampler", shuffle=True),
     dataset=dict(
         type="RepeatDataset",
         times=2,
@@ -99,9 +98,6 @@ train_dataloader = dict(
 val_dataloader = dict(
     batch_size=2,
     num_workers=2,
-    persistent_workers=True,
-    drop_last=False,
-    sampler=dict(type="DefaultSampler", shuffle=False),
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
@@ -117,9 +113,6 @@ val_dataloader = dict(
 test_dataloader = dict(
     batch_size=2,
     num_workers=2,
-    persistent_workers=True,
-    drop_last=False,
-    sampler=dict(type="DefaultSampler", shuffle=False),
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
