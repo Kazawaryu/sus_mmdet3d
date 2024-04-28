@@ -9,4 +9,4 @@
 
 nvidia-smi
 
-singularity run --nv ./shells/mmdet_0.5.sif bash ./tools/dist_train.sh ./configs/centerpoint/centerpoint_voxel01_suscape_3d.py 4 --work-dir ./work_dirs/centerpoint_voxel01_suscape_3d
+singularity run --nv ./shells/mmdet_0.5.sif bash ./tools/dist_train.sh ./configs/point_rcnn/point_rcnn_2x8_suscape-3d.py 4 --work-dir ./work_dirs/point_rcnn_2x8_suscape-3d_online

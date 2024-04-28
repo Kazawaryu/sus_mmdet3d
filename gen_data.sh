@@ -9,4 +9,4 @@
 
 nvidia-smi
 
-singularity run --nv ./shells/mmdet_0.5.sif python tools/create_data.py suscape --root-path ~/dataset/online/ --out-dir data/suscape --extra-tag suscape --version v1.0-trainval
+singularity run --nv ./shells/mmdet_0.5.sif python tools/create_data.py suscape --root-path ~/dataset/online_s1s2/ --out-dir data/suscape-online --extra-tag suscape --version v1.0-trainval

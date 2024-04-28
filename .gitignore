@@ -116,6 +116,7 @@ data
 *.log.json
 work_dirs/
 shells/
+results/
 exps/
 *~
 mmdet3d/.mim
