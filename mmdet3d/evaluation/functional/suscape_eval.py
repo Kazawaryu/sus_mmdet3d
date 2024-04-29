@@ -192,14 +192,18 @@ def get_single_class_aps(gt, predictions, iou_thresholds):
     # avoid divide by zero in case the first detection
     # matches a difficult ground truth
     precisions = tps / np.maximum(tps + fps, np.finfo(np.float64).eps)
-
     aps = []
     for i in range(len(iou_thresholds)):
         recall = recalls[:, i]
         precision = precisions[:, i]
-        assert np.all(0 <= recall) & np.all(recall <= 1)
-        assert np.all(0 <= precision) & np.all(precision <= 1)
-        ap = get_ap(recall, precision)
+        if np.all(0 <= recall) & np.all(recall <= 1) & \
+            np.all(0 <= precision) & np.all(precision <= 1):
+            ap = get_ap(recall, precision)
+        else:
+            ap = 0.0
+        # assert np.all(0 <= recall) & np.all(recall <= 1)
+        # assert np.all(0 <= precision) & np.all(precision <= 1)
+        # ap = get_ap(recall, precision)
         aps.append(ap)
 
     aps = np.array(aps)

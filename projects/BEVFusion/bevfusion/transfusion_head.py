@@ -851,8 +851,8 @@ class TransFusionHead(nn.Module):
                                               self.num_proposals:(idx_layer +
                                                                   1) *
                                               self.num_proposals, :, ]
-            layer_reg_weights = layer_bbox_weights * layer_bbox_weights.new_tensor(  # noqa: E501
-                code_weights)
+            temp_new = layer_bbox_weights.new_tensor(code_weights)
+            layer_reg_weights = layer_bbox_weights * temp_new
             layer_bbox_targets = bbox_targets[:, idx_layer *
                                               self.num_proposals:(idx_layer +
                                                                   1) *

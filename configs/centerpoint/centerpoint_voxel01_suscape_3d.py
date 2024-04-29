@@ -190,8 +190,8 @@ test_pipeline = [
 
 
 train_dataloader = dict(
-    batch_size=10,
-    num_workers=4,
+    batch_size=16,
+    num_workers=8,
     dataset=dict(
         dataset=dict(pipeline=train_pipeline, metainfo=dict(classes=class_names))
     ),
@@ -200,13 +200,13 @@ train_dataloader = dict(
 
 
 test_dataloader = dict(
-    batch_size=10,
-    num_workers=4,
+    batch_size=16,
+    num_workers=8,
     dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)),
 )
 val_dataloader = dict(
-    batch_size=10,
-    num_workers=4,
+    batch_size=16,
+    num_workers=8,
     dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)),
 )
 
