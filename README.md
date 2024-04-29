@@ -65,9 +65,11 @@ English | [简体中文](README_zh-CN.md)
 
 MMDetection3D is an open source object detection toolbox based on PyTorch, towards the next-generation platform for general 3D detection. It is a part of the [OpenMMLab](https://openmmlab.com/) project.
 
-The main branch works with **PyTorch 1.8+**.
+The sub branch works with **PyTorch 2.0**.
 
-![demo image](resources/mmdet3d_outdoor_demo.gif)
+### Attention
+
+Now you can train ``PointPillar``, ``CenterPoint``, ``Point RCNN``, ``SECOND`` on **SUSCape** dataset. More models will be supported soon...
 
 <details open>
 <summary>Major features</summary>
