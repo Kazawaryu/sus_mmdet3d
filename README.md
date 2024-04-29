@@ -69,7 +69,7 @@ The sub branch works with **PyTorch 2.0**.
 
 ### Attention
 
-Now you can train ``PointPillar``, ``CenterPoint``, ``Point RCNN``, ``SECOND`` on **SUSCape** dataset. More models will be supported soon...
+Now you can train ``PointPillar``, ``CenterPoint``, ``Point RCNN``, ``SECOND`` and ``BEVFusion`` on **SUSCape** dataset. More models will be supported very soon...
 
 <details open>
 <summary>Major features</summary>
