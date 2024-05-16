@@ -196,14 +196,14 @@ def get_single_class_aps(gt, predictions, iou_thresholds):
     for i in range(len(iou_thresholds)):
         recall = recalls[:, i]
         precision = precisions[:, i]
-        if np.all(0 <= recall) & np.all(recall <= 1) & \
-            np.all(0 <= precision) & np.all(precision <= 1):
-            ap = get_ap(recall, precision)
-        else:
-            ap = 0.0
-        # assert np.all(0 <= recall) & np.all(recall <= 1)
-        # assert np.all(0 <= precision) & np.all(precision <= 1)
-        # ap = get_ap(recall, precision)
+        # if np.all(0 <= recall) & np.all(recall <= 1) & \
+        #     np.all(0 <= precision) & np.all(precision <= 1):
+        #     ap = get_ap(recall, precision)
+        # else:
+        #     ap = 0.0
+        assert np.all(0 <= recall) & np.all(recall <= 1)
+        assert np.all(0 <= precision) & np.all(precision <= 1)
+        ap = get_ap(recall, precision)
         aps.append(ap)
 
     aps = np.array(aps)
